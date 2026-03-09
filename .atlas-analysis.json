@@ -1,0 +1,139 @@
+{
+  "projectType": "saas",
+  "projectName": "CONFOR",
+  "projectDescription": "Sistema de contabilidad forestal para gestión de patrimonio, activos biológicos y contabilidad de tierras",
+  "theme": "palm",
+  "primaryColor": "#2d5016",
+  "lightColor": "#4a7c2c",
+  "darkColor": "#1a3309",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "installation"
+            ]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/authentication",
+              "features/organizations",
+              "features/forest-patrimony",
+              "features/biological-assets",
+              "features/land-accounting",
+              "features/geospatial-import"
+            ]
+          },
+          {
+            "group": "User Guides",
+            "pages": [
+              "guides/managing-users",
+              "guides/configuring-roles",
+              "guides/importing-shapefiles",
+              "guides/forest-hierarchy",
+              "guides/audit-logs"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/environment-variables",
+              "configuration/database-setup",
+              "configuration/worker-setup"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api/auth/login",
+              "api/auth/register"
+            ]
+          },
+          {
+            "group": "Organizations",
+            "pages": [
+              "api/organizations/list",
+              "api/organizations/create"
+            ]
+          },
+          {
+            "group": "Forest Patrimony",
+            "pages": [
+              "api/patrimony/level2",
+              "api/patrimony/level3",
+              "api/patrimony/level4",
+              "api/patrimony/level5"
+            ]
+          },
+          {
+            "group": "Biological Assets",
+            "pages": [
+              "api/biological-assets/list",
+              "api/biological-assets/create",
+              "api/biological-assets/import"
+            ]
+          },
+          {
+            "group": "Geospatial",
+            "pages": [
+              "api/geo/import",
+              "api/geo/validate"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/config/forest-config",
+              "api/config/general-config"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Multi-organization forest patrimony management",
+    "Hierarchical forest structure (Finca → Lote → Rodal → Subunidad)",
+    "Geospatial shapefile import with background processing",
+    "Biological asset tracking for commercial forestry",
+    "Land accounting and FSC certification management",
+    "Role-based access control with audit logging",
+    "Multi-tenant architecture with organization isolation",
+    "Worker-based geospatial data processing"
+  ],
+  "publicApiSurface": [
+    "POST /api/auth/login",
+    "POST /api/auth/register",
+    "GET /api/organizations",
+    "POST /api/organizations",
+    "GET /api/forest/patrimony/level2",
+    "POST /api/forest/patrimony/level2",
+    "GET /api/forest/patrimony/level3",
+    "POST /api/forest/patrimony/level3",
+    "GET /api/forest/patrimony/level4",
+    "POST /api/forest/patrimony/level4",
+    "GET /api/forest/biological-assets",
+    "POST /api/forest/biological-assets",
+    "POST /api/forest/biological-assets/import",
+    "POST /api/forest/geo/import",
+    "POST /api/forest/geo/validate",
+    "GET /api/forest/config/inventory-types",
+    "GET /api/forest/config/ima-classes",
+    "GET /api/users",
+    "POST /api/users",
+    "GET /api/roles",
+    "POST /api/roles",
+    "GET /api/audit"
+  ]
+}
