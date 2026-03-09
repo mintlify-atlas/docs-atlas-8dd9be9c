@@ -1,0 +1,553 @@
+---
+title: "Forest Configuration"
+description: "Manage forest-related configuration entities (species, spacings, provenances, etc.)"
+---
+
+## Overview
+
+The Forest Configuration API provides CRUD operations for forest management reference data:
+
+- **Species** (`/api/forest/config/species`)
+- **Spacings** (`/api/forest/config/spacings`)
+- **Provenances** (`/api/forest/config/provenances`)
+- **Vegetal Materials** (`/api/forest/config/vegetal-materials`)
+- **Product Types** (`/api/forest/config/product-types`)
+- **Management Schemes** (`/api/forest/config/management-schemes`)
+- **IMA Classes** (`/api/forest/config/ima-classes`)
+- **Inventory Types** (`/api/forest/config/inventory-types`)
+- **Land Use Types** (`/api/forest/config/land-use-types`)
+- **Level 4 Costs** (`/api/forest/config/level4-costs`)
+
+All endpoints follow consistent patterns for list, create, update, and delete operations.
+
+<Note>
+  Configuration entities are **organization-scoped**. Users can only access and modify data for their assigned organization.
+</Note>
+
+---
+
+## Species Management
+
+### GET `/api/forest/config/species`
+
+List all species with pagination and search.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:READ` (or any `forest-config:CREATE/UPDATE/DELETE`)
+
+#### Query Parameters
+
+<ParamField query="page" type="number" default="1">
+  Page number (1-indexed)
+</ParamField>
+
+<ParamField query="limit" type="number" default="25">
+  Items per page (max: 100)
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search filter (matches code, scientificName, or commonName)
+</ParamField>
+
+<ParamField query="sortBy" type="string" default="createdAt">
+  Sort field: `code`, `scientificName`, `commonName`, `genus`, `family`, `taxonomicOrder`, `isActive`, `createdAt`, `updatedAt`
+</ParamField>
+
+<ParamField query="sortOrder" type="string" default="desc">
+  Sort order: `asc` or `desc`
+</ParamField>
+
+#### Response
+
+<ResponseField name="items" type="array">
+  Array of species records
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  - `total`: Total number of records
+  - `page`: Current page
+  - `limit`: Items per page
+  - `totalPages`: Total number of pages
+</ResponseField>
+
+#### Example: List Species
+
+```bash cURL
+curl -X GET "https://api.confor.com/api/forest/config/species?page=1&limit=25&search=Pinus" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```json Response
+{
+  "items": [
+    {
+      "id": "species_001",
+      "organizationId": "org_123",
+      "code": "PIN-CAR",
+      "scientificName": "Pinus caribaea",
+      "commonName": "Pino Caribe",
+      "genus": "Pinus",
+      "family": "Pinaceae",
+      "taxonomicOrder": "Pinales",
+      "isActive": true,
+      "createdAt": "2026-01-15T08:00:00Z",
+      "updatedAt": "2026-01-15T08:00:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 45,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 2
+  }
+}
+```
+
+---
+
+### POST `/api/forest/config/species`
+
+Create a new species.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:CREATE`
+
+#### Request Body
+
+<ParamField body="code" type="string" required>
+  Unique species code (organization-scoped)
+</ParamField>
+
+<ParamField body="scientificName" type="string" required>
+  Scientific name (binomial nomenclature)
+</ParamField>
+
+<ParamField body="commonName" type="string" required>
+  Common name in local language
+</ParamField>
+
+<ParamField body="genus" type="string" required>
+  Taxonomic genus
+</ParamField>
+
+<ParamField body="family" type="string" required>
+  Taxonomic family
+</ParamField>
+
+<ParamField body="taxonomicOrder" type="string" required>
+  Taxonomic order
+</ParamField>
+
+<ParamField body="isActive" type="boolean" default="true">
+  Active status
+</ParamField>
+
+#### Response
+
+Returns the created species record.
+
+#### Example: Create Species
+
+```bash cURL
+curl -X POST https://api.confor.com/api/forest/config/species \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "EUC-GRA",
+    "scientificName": "Eucalyptus grandis",
+    "commonName": "Eucalipto Grande",
+    "genus": "Eucalyptus",
+    "family": "Myrtaceae",
+    "taxonomicOrder": "Myrtales",
+    "isActive": true
+  }'
+```
+
+---
+
+### PATCH `/api/forest/config/species`
+
+Update an existing species.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:UPDATE`
+
+#### Request Body
+
+<ParamField body="id" type="string" required>
+  Species UUID to update
+</ParamField>
+
+<ParamField body="code" type="string">
+  Updated code
+</ParamField>
+
+<ParamField body="scientificName" type="string">
+  Updated scientific name
+</ParamField>
+
+<ParamField body="commonName" type="string">
+  Updated common name
+</ParamField>
+
+<ParamField body="genus" type="string">
+  Updated genus
+</ParamField>
+
+<ParamField body="family" type="string">
+  Updated family
+</ParamField>
+
+<ParamField body="taxonomicOrder" type="string">
+  Updated taxonomic order
+</ParamField>
+
+<ParamField body="isActive" type="boolean">
+  Active status
+</ParamField>
+
+#### Response
+
+Returns the updated species record.
+
+---
+
+### DELETE `/api/forest/config/species`
+
+Delete a species.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:DELETE`
+
+#### Request Body
+
+<ParamField body="id" type="string" required>
+  Species UUID to delete
+</ParamField>
+
+#### Response
+
+<ResponseField name="id" type="string">
+  Deleted species UUID
+</ResponseField>
+
+<Warning>
+  Cannot delete a species that has related vegetal materials. Returns `409 Conflict` with error: `"No se puede eliminar la especie porque tiene materiales vegetales relacionados"`
+</Warning>
+
+---
+
+## Spacings Management
+
+### GET `/api/forest/config/spacings`
+
+List all planting spacings.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:READ`
+
+#### Query Parameters
+
+Same as species endpoint: `page`, `limit`, `search`, `sortBy`, `sortOrder`
+
+**Search fields**: `code`, `name`  
+**Sort fields**: `code`, `name`, `isActive`, `createdAt`, `updatedAt`
+
+#### Response
+
+Returns paginated list of spacing records:
+
+```json
+{
+  "id": "spacing_001",
+  "organizationId": "org_123",
+  "code": "3X2",
+  "name": "3m x 2m",
+  "description": "Espaciamiento estándar para pino",
+  "betweenRowsM": 3.0,
+  "betweenTreesM": 2.0,
+  "treeDensityPerHa": 1666.67,
+  "isActive": true,
+  "createdAt": "2026-01-15T08:00:00Z",
+  "updatedAt": "2026-01-15T08:00:00Z"
+}
+```
+
+---
+
+### POST `/api/forest/config/spacings`
+
+Create a new spacing configuration.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:CREATE`
+
+#### Request Body
+
+<ParamField body="code" type="string" required>
+  Unique spacing code
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  Spacing name/label
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description
+</ParamField>
+
+<ParamField body="betweenRowsM" type="number">
+  Distance between rows in meters
+</ParamField>
+
+<ParamField body="betweenTreesM" type="number">
+  Distance between trees in meters
+</ParamField>
+
+<ParamField body="treeDensityPerHa" type="number">
+  Tree density per hectare (calculated or manual)
+</ParamField>
+
+<ParamField body="isActive" type="boolean" default="true">
+  Active status
+</ParamField>
+
+---
+
+### PATCH `/api/forest/config/spacings`
+
+Update a spacing configuration.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:UPDATE`
+
+#### Request Body
+
+Same fields as POST, with `id` required.
+
+---
+
+### DELETE `/api/forest/config/spacings`
+
+Delete a spacing configuration.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:DELETE`
+
+#### Request Body
+
+<ParamField body="id" type="string" required>
+  Spacing UUID to delete
+</ParamField>
+
+---
+
+## Import/Export Operations
+
+All configuration entities support bulk import/export operations.
+
+### Export Configuration Data
+
+**Endpoints:**
+- `GET /api/forest/config/species/export?format=csv|xlsx`
+- `GET /api/forest/config/spacings/export?format=csv|xlsx`
+- `GET /api/forest/config/provenances/export?format=csv|xlsx`
+- etc.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:READ`
+
+#### Query Parameters
+
+<ParamField query="format" type="string" default="csv">
+  Export format: `csv` or `xlsx`
+</ParamField>
+
+#### Response
+
+Returns a downloadable file with all active records for the organization.
+
+#### Example: Export Species to Excel
+
+```bash cURL
+curl -X GET "https://api.confor.com/api/forest/config/species/export?format=xlsx" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -o species_export.xlsx
+```
+
+---
+
+### Import Configuration Data
+
+**Endpoints:**
+- `POST /api/forest/config/species/import`
+- `POST /api/forest/config/spacings/import`
+- `POST /api/forest/config/provenances/import`
+- etc.
+
+**Authentication:** Required  
+**Permissions:** `forest-config:CREATE`
+
+#### Request
+
+<ParamField body="file" type="file" required>
+  CSV or Excel file with configuration data. Must include all required fields.
+</ParamField>
+
+#### Response
+
+<ResponseField name="imported" type="number">
+  Number of successfully imported records
+</ResponseField>
+
+<ResponseField name="failed" type="number">
+  Number of failed records
+</ResponseField>
+
+<ResponseField name="errors" type="array">
+  Array of error messages for failed records
+</ResponseField>
+
+#### Example: Import Spacings
+
+```bash cURL
+curl -X POST https://api.confor.com/api/forest/config/spacings/import \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@spacings.csv"
+```
+
+```json Response
+{
+  "imported": 12,
+  "failed": 1,
+  "errors": [
+    "Fila 5: Ya existe un registro con el código '3X2'"
+  ]
+}
+```
+
+<Tip>
+  Download an export file as a template to ensure correct column structure for imports.
+</Tip>
+
+---
+
+## Other Configuration Entities
+
+The following entities follow the same CRUD pattern:
+
+### Provenances
+**Endpoint:** `/api/forest/config/provenances`  
+**Fields:** `code`, `name`, `description`, `country`, `region`, `isActive`
+
+### Vegetal Materials
+**Endpoint:** `/api/forest/config/vegetal-materials`  
+**Fields:** `code`, `name`, `description`, `speciesId`, `provenanceId`, `isActive`  
+**Relations:** Requires valid `speciesId` and `provenanceId`
+
+### Product Types
+**Endpoint:** `/api/forest/config/product-types`  
+**Fields:** `code`, `name`, `description`, `unitOfMeasure`, `isActive`
+
+### Management Schemes
+**Endpoint:** `/api/forest/config/management-schemes`  
+**Fields:** `code`, `name`, `description`, `rotationYears`, `isActive`
+
+### IMA Classes
+**Endpoint:** `/api/forest/config/ima-classes`  
+**Fields:** `code`, `name`, `description`, `minValue`, `maxValue`, `isActive`  
+**Note:** IMA = Incremento Medio Anual (Mean Annual Increment)
+
+### Inventory Types
+**Endpoint:** `/api/forest/config/inventory-types`  
+**Fields:** `code`, `name`, `description`, `isActive`
+
+### Land Use Types
+**Endpoint:** `/api/forest/config/land-use-types`  
+**Fields:** `code`, `name`, `category`, `surfaceHa`, `isActive`  
+**Note:** `surfaceHa` is automatically calculated from Level 4 geometries
+
+### Level 4 Costs
+**Endpoint:** `/api/forest/config/level4-costs`  
+**Fields:** `level4Id`, `costTypeCode`, `costTypeDescription`, `amountUsd`, `currencyCode`, `costDate`  
+**Note:** Links cost data to specific Level 4 geometries
+
+---
+
+## Validation Rules
+
+### Code Uniqueness
+- All `code` fields must be unique within the organization
+- Duplicate codes return `409 Conflict` with message: `"Ya existe un registro con ese código"`
+
+### Referential Integrity
+- Cannot delete entities with active relationships (e.g., species with vegetal materials)
+- Returns `409 Conflict` with descriptive message
+
+### Organization Scoping
+- All queries are automatically filtered by `organizationId` from authenticated user
+- Super admins can access all organizations' data
+
+---
+
+## Audit Logging
+
+All create, update, and delete operations are automatically logged to the `AuditLog` table:
+
+```json Audit Log Entry
+{
+  "userId": "user_123",
+  "action": "CREATE",
+  "entityType": "Species",
+  "entityId": "species_001",
+  "oldValues": null,
+  "newValues": {
+    "code": "PIN-CAR",
+    "scientificName": "Pinus caribaea",
+    "commonName": "Pino Caribe"
+  },
+  "timestamp": "2026-03-09T10:15:30Z"
+}
+```
+
+<Info>
+  Audit logs are partitioned by month for efficient querying and archival.
+</Info>
+
+---
+
+## Error Responses
+
+| Status Code | Error | Cause |
+|-------------|-------|-------|
+| `400` | `Parámetros inválidos` | Invalid query parameters or request body |
+| `400` | `Datos inválidos` | Schema validation failure (missing required fields, invalid types) |
+| `403` | `Forbidden` | Insufficient permissions |
+| `404` | `Registro no encontrado` | Entity ID doesn't exist |
+| `409` | `Ya existe un registro con ese código` | Code uniqueness violation |
+| `409` | `No se puede eliminar...` | Referential integrity violation |
+| `500` | `No fue posible...` | Unexpected server error |
+
+---
+
+## Permissions Summary
+
+| Action | Required Permission |
+|--------|--------------------|
+| List/Read | `forest-config:READ` (or any write permission) |
+| Create | `forest-config:CREATE` |
+| Update | `forest-config:UPDATE` |
+| Delete | `forest-config:DELETE` |
+| Import | `forest-config:CREATE` |
+| Export | `forest-config:READ` |
+
+<Note>
+  Super admins bypass permission checks and have full access.
+</Note>
+
+---
+
+## Related Endpoints
+
+- [Geospatial Import](/api/geo/import) - Uses land use types from configuration
+- [Forest Patrimony](/api/patrimony/level2) - Links to species, spacings, and other configs

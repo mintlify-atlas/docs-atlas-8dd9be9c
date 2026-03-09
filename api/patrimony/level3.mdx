@@ -1,0 +1,305 @@
+---
+title: 'Level 3 - Compartments'
+api: 'GET /api/forest/patrimony'
+---
+
+## Overview
+
+Level 3 represents compartments, blocks, or sections within Level 2 patrimony units. These are subdivisions that help organize large land holdings into manageable areas.
+
+## Hierarchy
+
+```
+Level 2 (FINCA, PREDIO, etc.)
+  └─ Level 3 (COMPARTIMIENTO, BLOCK, etc.) ← You are here
+      └─ Level 4 (Stands, Parcels, Management Units)
+          └─ Level 5 (Reference Units, Sub-parcels)
+```
+
+**Parent Relationship:** Each Level 3 unit must belong to a Level 2 unit via `level2Id`.
+
+## List Level 3 Units
+
+<ParamField query="level" type="string" required>
+  Must be set to `"3"` to retrieve Level 3 units
+</ParamField>
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="25">
+  Number of items per page
+</ParamField>
+
+<ParamField query="parentId" type="string">
+  Filter by Level 2 parent ID (UUID)
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search by code or name (case-insensitive)
+</ParamField>
+
+### Response
+
+<ResponseField name="items" type="array">
+  <ResponseField name="id" type="string">
+    Unique identifier (UUID)
+  </ResponseField>
+
+  <ResponseField name="level2Id" type="string">
+    Parent Level 2 unit ID (UUID)
+  </ResponseField>
+
+  <ResponseField name="code" type="string">
+    Unique code for the unit (max 80 characters, unique within parent)
+  </ResponseField>
+
+  <ResponseField name="name" type="string">
+    Name of the compartment
+  </ResponseField>
+
+  <ResponseField name="type" type="enum">
+    Type of compartment. Possible values:
+    - `COMPARTIMIENTO` - Compartment
+    - `BLOCK` - Block
+    - `SECCION` - Section
+    - `LOTE` - Lot
+    - `ZONA` - Zone
+    - `BLOQUE` - Block (alternative)
+    - `ZONIFICACION` - Zoning
+  </ResponseField>
+
+  <ResponseField name="totalAreaHa" type="number">
+    Total area in hectares
+  </ResponseField>
+
+  <ResponseField name="centroidLatitude" type="number">
+    Latitude of centroid (-90 to 90)
+  </ResponseField>
+
+  <ResponseField name="centroidLongitude" type="number">
+    Longitude of centroid (-180 to 180)
+  </ResponseField>
+
+  <ResponseField name="lastInfoDate" type="date">
+    Date of last information update
+  </ResponseField>
+
+  <ResponseField name="isActive" type="boolean" default="true">
+    Whether the unit is active
+  </ResponseField>
+
+  <ResponseField name="createdAt" type="datetime">
+    Creation timestamp
+  </ResponseField>
+
+  <ResponseField name="updatedAt" type="datetime">
+    Last update timestamp
+  </ResponseField>
+
+  <ResponseField name="level2" type="object">
+    Parent Level 2 unit information
+    <ResponseField name="id" type="string">
+      Level 2 ID
+    </ResponseField>
+    <ResponseField name="code" type="string">
+      Level 2 code
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Level 2 name
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  <ResponseField name="total" type="number">
+    Total number of items
+  </ResponseField>
+
+  <ResponseField name="page" type="number">
+    Current page number
+  </ResponseField>
+
+  <ResponseField name="limit" type="number">
+    Items per page
+  </ResponseField>
+
+  <ResponseField name="totalPages" type="number">
+    Total number of pages
+  </ResponseField>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.confor.app/api/forest/patrimony?level=3&parentId=550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.confor.app/api/forest/patrimony?level=3&parentId=550e8400-e29b-41d4-a716-446655440000',
+  {
+    headers: {
+      'Authorization': 'Bearer YOUR_TOKEN'
+    }
+  }
+);
+const data = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "items": [
+    {
+      "id": "660e8400-e29b-41d4-a716-446655440001",
+      "level2Id": "550e8400-e29b-41d4-a716-446655440000",
+      "code": "COMP-A",
+      "name": "Compartimiento Norte",
+      "type": "COMPARTIMIENTO",
+      "totalAreaHa": 450.25,
+      "centroidLatitude": 10.52,
+      "centroidLongitude": -66.88,
+      "lastInfoDate": "2024-01-10T00:00:00Z",
+      "isActive": true,
+      "createdAt": "2024-01-15T10:35:00Z",
+      "updatedAt": "2024-01-15T10:35:00Z",
+      "level2": {
+        "id": "550e8400-e29b-41d4-a716-446655440000",
+        "code": "FINCA-001",
+        "name": "La Esperanza"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 1
+  }
+}
+```
+</ResponseExample>
+
+---
+
+## Create Level 3 Unit
+
+<api>POST /api/forest/patrimony</api>
+
+### Request Body
+
+<ParamField body="level" type="string" required>
+  Must be set to `"3"` to create a Level 3 unit
+</ParamField>
+
+<ParamField body="data" type="object" required>
+  <ParamField body="level2Id" type="string" required>
+    Parent Level 2 unit ID (UUID)
+  </ParamField>
+
+  <ParamField body="code" type="string" required>
+    Unique code within parent (1-80 characters)
+  </ParamField>
+
+  <ParamField body="name" type="string" required>
+    Name of the compartment (2-255 characters)
+  </ParamField>
+
+  <ParamField body="type" type="enum" required>
+    Type: `COMPARTIMIENTO`, `BLOCK`, `SECCION`, `LOTE`, `ZONA`, `BLOQUE`, `ZONIFICACION`
+  </ParamField>
+
+  <ParamField body="totalAreaHa" type="number" required>
+    Total area in hectares (must be non-negative)
+  </ParamField>
+
+  <ParamField body="centroidLatitude" type="number">
+    Latitude of centroid (-90 to 90)
+  </ParamField>
+
+  <ParamField body="centroidLongitude" type="number">
+    Longitude of centroid (-180 to 180)
+  </ParamField>
+
+  <ParamField body="lastInfoDate" type="date">
+    Date of last information update
+  </ParamField>
+
+  <ParamField body="isActive" type="boolean" default="true">
+    Whether the unit is active
+  </ParamField>
+</ParamField>
+
+### Response
+
+Returns the created Level 3 unit with status code 201, including the parent Level 2 information.
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://api.confor.app/api/forest/patrimony" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "level": "3",
+    "data": {
+      "level2Id": "550e8400-e29b-41d4-a716-446655440000",
+      "code": "COMP-A",
+      "name": "Compartimiento Norte",
+      "type": "COMPARTIMIENTO",
+      "totalAreaHa": 450.25,
+      "centroidLatitude": 10.52,
+      "centroidLongitude": -66.88
+    }
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.confor.app/api/forest/patrimony', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    level: '3',
+    data: {
+      level2Id: '550e8400-e29b-41d4-a716-446655440000',
+      code: 'COMP-A',
+      name: 'Compartimiento Norte',
+      type: 'COMPARTIMIENTO',
+      totalAreaHa: 450.25,
+      centroidLatitude: 10.52,
+      centroidLongitude: -66.88
+    }
+  })
+});
+const data = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "id": "660e8400-e29b-41d4-a716-446655440001",
+  "level2Id": "550e8400-e29b-41d4-a716-446655440000",
+  "code": "COMP-A",
+  "name": "Compartimiento Norte",
+  "type": "COMPARTIMIENTO",
+  "totalAreaHa": 450.25,
+  "centroidLatitude": 10.52,
+  "centroidLongitude": -66.88,
+  "lastInfoDate": null,
+  "isActive": true,
+  "createdAt": "2024-01-15T10:35:00Z",
+  "updatedAt": "2024-01-15T10:35:00Z",
+  "level2": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "code": "FINCA-001",
+    "name": "La Esperanza"
+  }
+}
+```
+</ResponseExample>

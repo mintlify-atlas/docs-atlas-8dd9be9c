@@ -1,0 +1,535 @@
+---
+title: Biological Assets (Level 6)
+description: Forest stand and plantation inventory management with growth metrics, valuation, and IMA classification
+---
+
+## Overview
+
+**Biological Assets** represent Level 6 in CONFOR's forest patrimony hierarchy — individual forest stands, plantations, or inventory units within Level 4 management units. This module tracks growth metrics, genetic material, management schemes, and economic valuation for accounting purposes.
+
+<Info>
+  Biological assets are the "accounting units" that represent measurable forest value. They link operational forestry data with financial accounting systems.
+</Info>
+
+## Key Capabilities
+
+<CardGroup cols={2}>
+  <Card title="Stand Inventory" icon="tree">
+    Track volume, height, diameter, basal area, and tree density
+  </Card>
+  <Card title="Genetic Material" icon="dna">
+    Document species, provenances, and genetic improvement programs
+  </Card>
+  <Card title="Growth Metrics" icon="chart-line">
+    Calculate IMA (Mean Annual Increment) and site index classifications
+  </Card>
+  <Card title="Economic Valuation" icon="dollar-sign">
+    Record establishment costs and fair value for accounting
+  </Card>
+</CardGroup>
+
+## Data Model
+
+### Biological Asset Schema
+
+```typescript prisma/schema.prisma
+model ForestBiologicalAssetLevel6 {
+  id                            String                @id @default(uuid())
+  level4Id                      String                // Parent management unit
+  biologicalAssetKey            String                @unique // Primary identifier
+  accountingKey                 String?               // Financial system link
+  establishmentDate             DateTime?
+  plantingYear                  Int?
+  
+  // Genetic Material
+  geneticMaterialCode           String?
+  geneticMaterialName           String?
+  
+  // Type
+  assetType                     BiologicalAssetType   @default(COMERCIAL)
+  
+  // Management
+  managementSchemeCode          String?
+  managementSchemeName          String?
+  
+  // Inventory
+  inventoryCode                 String?
+  inventoryType                 String?
+  inventoryDate                 DateTime?
+  inventoryAgeYears             Int?
+  level5UnitCount               Int?                  // Number of sample plots
+  
+  // Spacing
+  spacingCode                   String?
+  spacingDescription            String?
+  spacingBetweenRowsM           Decimal?
+  spacingBetweenTreesM          Decimal?
+  treeDensityPerHa              Decimal?
+  survivalRate                  Decimal?              // 0-100%
+  
+  // Growth Metrics
+  dominantHeightM               Decimal?
+  meanHeightM                   Decimal?
+  quadraticDiameterM            Decimal?
+  basalAreaM2                   Decimal?
+  
+  // Volume
+  unitVolumeM3NoBarkPerHa       Decimal?
+  unitVolumeM3WithBarkPerHa     Decimal?
+  totalVolumeM3NoBark           Decimal?
+  totalVolumeM3WithBark         Decimal?
+  adjustedVolumeM3NoBarkPerHa   Decimal?
+  adjustedVolumeM3WithBarkPerHa Decimal?
+  
+  // IMA Classification
+  imaClassCode                  String?
+  imaClassName                  String?
+  
+  // Economic
+  actualCostUsd                 Decimal?              // Establishment cost
+  
+  isActive                      Boolean               @default(true)
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
+  
+  level4                        ForestPatrimonyLevel4
+}
+```
+
+### Asset Types
+
+```typescript prisma/schema.prisma
+enum BiologicalAssetType {
+  COMERCIAL     // Commercial production
+  INVESTIGACION // Research/experimental
+}
+```
+
+## Creating Biological Assets
+
+### User Workflow
+
+<Steps>
+  <Step title="Select Management Unit">
+    Navigate to a Level 4 management unit (RODAL, PARCELA, etc.)
+  </Step>
+  <Step title="Create New Asset">
+    Click **New Biological Asset** and fill in:
+    - Unique biological asset key (e.g., `BA-RODAL-A1-2019-PC`)
+    - Establishment date and planting year
+    - Asset type (commercial or research)
+  </Step>
+  <Step title="Genetic Material">
+    Document:
+    - Species (linked to species catalog)
+    - Genetic material code and name
+    - Provenance (origin)
+    - Plant type (seedling, clone, etc.)
+  </Step>
+  <Step title="Management Details">
+    Configure:
+    - Management scheme
+    - Spacing configuration
+    - Survival rate
+  </Step>
+  <Step title="Inventory Data">
+    Enter measurement data:
+    - Inventory date and age
+    - Height and diameter metrics
+    - Volume calculations
+    - IMA classification
+  </Step>
+  <Step title="Economic Valuation">
+    Record establishment costs for accounting integration
+  </Step>
+</Steps>
+
+## API Operations
+
+### Creating Assets
+
+**POST** `/api/forest/biological-assets`
+
+```typescript src/validations/forest-biological-asset.schema.ts
+export const createBiologicalAssetSchema = z.object({
+  level4Id: uuidSchema,
+  biologicalAssetKey: z.string().trim().min(1).max(220),
+  accountingKey: nullableString,
+  establishmentDate: nullableDate,
+  plantingYear: nullableInt,
+  geneticMaterialCode: nullableString,
+  geneticMaterialName: nullableString,
+  assetType: z.enum(["COMERCIAL", "INVESTIGACION"]).default("COMERCIAL"),
+  // ... additional fields
+});
+```
+
+**Example Request:**
+
+```json
+{
+  "level4Id": "550e8400-e29b-41d4-a716-446655440000",
+  "biologicalAssetKey": "BA-RODAL-A1-2019-PINO",
+  "accountingKey": "AB-2019-001",
+  "establishmentDate": "2019-03-15",
+  "plantingYear": 2019,
+  "geneticMaterialCode": "PC-001",
+  "geneticMaterialName": "Pino Caribe - Lote Semillero",
+  "assetType": "COMERCIAL",
+  "managementSchemeCode": "INT-001",
+  "managementSchemeName": "Manejo Intensivo",
+  "spacingCode": "3X3",
+  "spacingBetweenRowsM": 3.0,
+  "spacingBetweenTreesM": 3.0,
+  "treeDensityPerHa": 1111,
+  "survivalRate": 85.5,
+  "inventoryCode": "INV-2024-001",
+  "inventoryType": "Censo",
+  "inventoryDate": "2024-02-10",
+  "inventoryAgeYears": 5,
+  "dominantHeightM": 12.5,
+  "meanHeightM": 11.2,
+  "quadraticDiameterM": 0.145,
+  "basalAreaM2": 18.5,
+  "unitVolumeM3NoBarkPerHa": 85.3,
+  "totalVolumeM3NoBark": 3853.5,
+  "imaClassCode": "IMA-III",
+  "imaClassName": "Clase III (18-22 m³/ha/año)",
+  "actualCostUsd": 2500.00
+}
+```
+
+### Querying Assets
+
+**GET** `/api/forest/biological-assets?level4Id={id}&search=PINO`
+
+**Query Parameters:**
+- `level4Id`: Filter by parent Level 4 unit
+- `search`: Text search in biological asset key, accounting key, genetic material
+- `sortBy`: Sort field (default: `biologicalAssetKey`)
+- `sortOrder`: `asc` or `desc` (default: `asc`)
+- `page`: Page number
+- `limit`: Items per page (max: 100)
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "biologicalAssetKey": "BA-RODAL-A1-2019-PINO",
+      "accountingKey": "AB-2019-001",
+      "plantingYear": 2019,
+      "geneticMaterialName": "Pino Caribe - Lote Semillero",
+      "assetType": "COMERCIAL",
+      "inventoryAgeYears": 5,
+      "totalVolumeM3NoBark": "3853.50",
+      "imaClassName": "Clase III (18-22 m³/ha/año)",
+      "actualCostUsd": "2500.00",
+      "level4": {
+        "code": "RODAL-A1",
+        "name": "Rodal A1"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 150,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 6
+  }
+}
+```
+
+### Updating Assets
+
+**PATCH** `/api/forest/biological-assets/[id]`
+
+Update inventory data after measurements:
+
+```json
+{
+  "inventoryCode": "INV-2025-001",
+  "inventoryDate": "2025-02-15",
+  "inventoryAgeYears": 6,
+  "dominantHeightM": 15.2,
+  "meanHeightM": 13.8,
+  "quadraticDiameterM": 0.178,
+  "basalAreaM2": 22.3,
+  "unitVolumeM3NoBarkPerHa": 112.5,
+  "totalVolumeM3NoBark": 5062.5,
+  "imaClassCode": "IMA-II",
+  "imaClassName": "Clase II (22-26 m³/ha/año)"
+}
+```
+
+### Deleting Assets
+
+**DELETE** `/api/forest/biological-assets/[id]`
+
+Permanently removes the biological asset record.
+
+<Warning>
+  Deleting biological assets removes accounting history. Consider setting `isActive: false` instead for soft deletion.
+</Warning>
+
+## Genetic Material Management
+
+Biological assets link to organization-specific genetic material catalogs:
+
+```typescript prisma/schema.prisma
+model VegetalMaterial {
+  id             String              @id @default(uuid())
+  organizationId String?
+  code           String
+  name           String
+  speciesId      String
+  materialType   VegetalMaterialType // PURA, HIBRIDA
+  plantType      PlantType           // PROGENIE, CLON, INJERTO, IN_VITRO
+  plantOrigin    PlantOrigin         // NATIVA, EXOTICA, etc.
+  provenanceId   String?
+  
+  species        Species
+  provenance     Provenance?
+}
+```
+
+### Material Types
+
+```typescript prisma/schema.prisma
+enum VegetalMaterialType {
+  PURA    // Pure species
+  HIBRIDA // Hybrid
+}
+
+enum PlantType {
+  PROGENIE  // Seedling from seed
+  CLON      // Vegetative clone
+  INJERTO   // Grafted
+  IN_VITRO  // Tissue culture
+}
+
+enum PlantOrigin {
+  NATIVA       // Native to region
+  EXOTICA      // Exotic/introduced
+  NATURALIZADA // Naturalized
+  INTRODUCIDA  // Recently introduced
+  ENDEMICA     // Endemic
+  CULTIVADA    // Cultivated variety
+}
+```
+
+## IMA Classification
+
+IMA (Incremento Medio Anual / Mean Annual Increment) classifies site productivity:
+
+```typescript prisma/schema.prisma
+model ImaClass {
+  id             String            @id @default(uuid())
+  organizationId String?
+  code           String
+  classification ImaClassification // I, II, III, IV, V
+  name           String
+  description    String?
+  rangeMin       Decimal?          // Min m³/ha/year
+  rangeMax       Decimal?          // Max m³/ha/year
+}
+
+enum ImaClassification {
+  I    // Highest productivity
+  II
+  III
+  IV
+  V    // Lowest productivity
+}
+```
+
+**Example IMA Classes:**
+
+| Class | Range (m³/ha/year) | Site Quality |
+|-------|---------------------|-------------|
+| I | > 26 | Excellent |
+| II | 22 - 26 | Good |
+| III | 18 - 22 | Average |
+| IV | 14 - 18 | Below Average |
+| V | < 14 | Poor |
+
+## Spacing Configurations
+
+Plantation spacing affects tree density and growth:
+
+```typescript prisma/schema.prisma
+model Spacing {
+  id               String  @id @default(uuid())
+  organizationId   String?
+  code             String
+  name             String
+  description      String?
+  betweenRowsM     Decimal?
+  betweenTreesM    Decimal?
+  treeDensityPerHa Decimal? // Calculated as 10,000 / (rows * trees)
+}
+```
+
+**Common Spacings:**
+
+- **3x3**: 1,111 trees/ha (intensive management)
+- **3x2**: 1,666 trees/ha (high density)
+- **4x3**: 833 trees/ha (moderate)
+- **5x5**: 400 trees/ha (extensive)
+
+## Volume Calculations
+
+Biological assets track multiple volume metrics:
+
+<Tabs>
+  <Tab title="Unit Volume">
+    Volume per hectare:
+    - `unitVolumeM3NoBarkPerHa`: Commercial volume (m³/ha)
+    - `unitVolumeM3WithBarkPerHa`: Total volume including bark
+  </Tab>
+  
+  <Tab title="Total Volume">
+    Total volume for the entire stand:
+    - `totalVolumeM3NoBark = unitVolumeM3NoBarkPerHa × totalAreaHa`
+    - `totalVolumeM3WithBark = unitVolumeM3WithBarkPerHa × totalAreaHa`
+  </Tab>
+  
+  <Tab title="Adjusted Volume">
+    Volume adjusted for site conditions, defects, or management:
+    - `adjustedVolumeM3NoBarkPerHa`: Accounts for operational factors
+    - Used for harvest planning and valuation
+  </Tab>
+</Tabs>
+
+## Growth Metrics
+
+### Diameter and Height
+
+- **Dominant Height** (`dominantHeightM`): Average height of dominant trees (used for site index)
+- **Mean Height** (`meanHeightM`): Average height of all trees
+- **Quadratic Diameter** (`quadraticDiameterM`): Square root of mean squared diameter (DBH)
+
+### Basal Area
+
+`basalAreaM2`: Sum of cross-sectional areas of all trees at breast height per hectare
+
+**Calculation:**
+```
+Basal Area = (π/4) × Σ(DBH²) × density
+```
+
+### Survival Rate
+
+`survivalRate`: Percentage of planted trees still alive
+
+```
+Survival Rate = (Current Trees / Initial Trees) × 100
+```
+
+## Management Schemes
+
+Organizations define management approaches:
+
+```typescript prisma/schema.prisma
+model ManagementScheme {
+  id             String        @id @default(uuid())
+  organizationId String?
+  code           String
+  name           String
+  isActive       Boolean       @default(true)
+}
+```
+
+**Example Schemes:**
+- **INT-001**: Intensive Management (fertilization, pruning, thinning)
+- **EXT-001**: Extensive Management (minimal intervention)
+- **AGR-001**: Agroforestry System
+- **CON-001**: Conservation/Protection
+
+## Inventory Types
+
+Different inventory methodologies:
+
+```typescript prisma/schema.prisma
+model ForestInventoryTypeCatalog {
+  id             String  @id @default(uuid())
+  organizationId String?
+  code           String
+  name           String
+}
+```
+
+**Common Types:**
+- **CENSO**: Complete enumeration (100% of trees)
+- **MUESTREO**: Statistical sampling
+- **ESTIMACION**: Visual/expert estimation
+- **DASOMETRICO**: Dasometric measurements
+
+## Import/Export
+
+### Bulk Import
+
+**POST** `/api/forest/biological-assets/import`
+
+Import biological assets from CSV/Excel:
+
+**Required columns:**
+- `nivel4`: Level 4 code (parent unit)
+- `claveactivo`: Biological asset key (unique)
+- `fechaestab`: Establishment date
+- `añoplantacion`: Planting year
+- `materialgen`: Genetic material
+- `volumenm3`: Volume m³ without bark
+
+### Bulk Export
+
+**GET** `/api/forest/biological-assets/export?level4Id={id}`
+
+Export to CSV or Excel for analysis in external tools.
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Naming Conventions">
+    - Use consistent biological asset keys: `BA-{LEVEL4}-{YEAR}-{SPECIES}`
+    - Link accounting keys to financial systems
+    - Document genetic material sources
+  </Accordion>
+  
+  <Accordion title="Inventory Frequency">
+    - Young plantations (0-5 years): Annual measurements
+    - Growing stands (5-15 years): Every 2-3 years
+    - Mature stands (15+ years): Every 3-5 years
+    - Update IMA classification after each inventory
+  </Accordion>
+  
+  <Accordion title="Data Quality">
+    - Validate volumes against expected growth curves
+    - Cross-check basal area and tree density
+    - Verify survival rates are realistic
+    - Document inventory methodology
+  </Accordion>
+  
+  <Accordion title="Economic Valuation">
+    - Record all establishment costs
+    - Update fair value based on market prices
+    - Track costs per hectare for budgeting
+    - Maintain cost history for analysis
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  **Integration Tips**
+  - Link biological assets to accounting systems via `accountingKey`
+  - Use IMA classification for yield predictions
+  - Track costs for financial reporting (IAS 41)
+  - Export data to growth and yield models
+</Tip>
+
+## Related Documentation
+
+- [Forest Patrimony](./forest-patrimony) - Understanding the hierarchy (Levels 2-5)
+- [Land Accounting](./land-accounting) - Tracking land use changes
+- [API Reference](/api/biological-assets/list) - Biological Assets API

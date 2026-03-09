@@ -1,0 +1,491 @@
+---
+title: "Geospatial Operations"
+description: "Split and merge Level 4 geometries with automated patrimonial variation tracking"
+---
+
+## Split Geometry
+
+### POST `/api/forest/geo/operations`
+
+Divide a single Level 4 geometry into two new geometries using a cut polygon.
+
+**Authentication:** Required  
+**Permissions:** `forest-patrimony:UPDATE`
+
+#### Request Body
+
+<ParamField body="operation" type="string" required>
+  Operation type: `"split"`
+</ParamField>
+
+<ParamField body="sourceLevel4Id" type="string" required>
+  UUID of the Level 4 geometry to split
+</ParamField>
+
+<ParamField body="cutGeometry" type="object" required>
+  GeoJSON geometry defining the cut area (Polygon or MultiPolygon)
+  
+  ```json
+  {
+    "type": "Polygon",
+    "coordinates": [[[lng1, lat1], [lng2, lat2], ...]]
+  }
+  ```
+</ParamField>
+
+<ParamField body="newItems" type="array" required>
+  Array of exactly 2 objects defining the resulting geometries:
+  
+  <ParamField body="newItems[].code" type="string" required>
+    New Level 4 code for the resulting geometry
+  </ParamField>
+  
+  <ParamField body="newItems[].name" type="string" required>
+    Name for the resulting geometry
+  </ParamField>
+  
+  <ParamField body="newItems[].type" type="string">
+    Level 4 type: `RODAL`, `PARCELA`, `ENUMERATION`, `UNIDAD_DE_MANEJO`, `CONUCO`, `OTRO_USO`
+    
+    Defaults to source geometry type
+  </ParamField>
+  
+  <ParamField body="newItems[].fscCertificateStatus" type="string">
+    FSC certification status: `SI` or `NO`
+    
+    Defaults to source status
+  </ParamField>
+  
+  <ParamField body="newItems[].currentLandUseName" type="string">
+    Current land use (must exist in `LandUseType` configuration)
+  </ParamField>
+  
+  <ParamField body="newItems[].previousLandUseName" type="string">
+    Previous land use name for variation tracking
+  </ParamField>
+</ParamField>
+
+<ParamField body="variationDate" type="string">
+  Date of the operation (ISO 8601 format). Defaults to current date.
+</ParamField>
+
+<ParamField body="variationNotes" type="string">
+  Notes for patrimonial variation audit trail
+</ParamField>
+
+#### Response
+
+<ResponseField name="operation" type="string">
+  Operation type: `"split"`
+</ResponseField>
+
+<ResponseField name="sourceLevel4Id" type="string">
+  UUID of the original (now inactive) geometry
+</ResponseField>
+
+<ResponseField name="createdLevel4Ids" type="array">
+  Array of 2 UUIDs for the newly created geometries
+</ResponseField>
+
+#### Example: Split a Stand
+
+```bash cURL
+curl -X POST https://api.confor.com/api/forest/geo/operations \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operation": "split",
+    "sourceLevel4Id": "550e8400-e29b-41d4-a716-446655440000",
+    "cutGeometry": {
+      "type": "Polygon",
+      "coordinates": [[[-70.5, 18.5], [-70.4, 18.5], [-70.4, 18.4], [-70.5, 18.4], [-70.5, 18.5]]]
+    },
+    "newItems": [
+      {
+        "code": "N4-001-A",
+        "name": "Rodal Norte",
+        "currentLandUseName": "BOSQUE"
+      },
+      {
+        "code": "N4-001-B",
+        "name": "Rodal Sur",
+        "currentLandUseName": "BOSQUE"
+      }
+    ],
+    "variationDate": "2026-03-09",
+    "variationNotes": "División administrativa para mejor gestión"
+  }'
+```
+
+```json Response
+{
+  "operation": "split",
+  "sourceLevel4Id": "550e8400-e29b-41d4-a716-446655440000",
+  "createdLevel4Ids": [
+    "660e8400-e29b-41d4-a716-446655440001",
+    "660e8400-e29b-41d4-a716-446655440002"
+  ]
+}
+```
+
+<Note>
+  The original geometry is marked as `isActive: false` and its `forest_geometry_n4` record is closed with `valid_to` timestamp.
+</Note>
+
+---
+
+## Merge Geometries
+
+### POST `/api/forest/geo/operations`
+
+Consolidate two adjacent Level 4 geometries into a single geometry.
+
+**Authentication:** Required  
+**Permissions:** `forest-patrimony:UPDATE`
+
+#### Request Body
+
+<ParamField body="operation" type="string" required>
+  Operation type: `"merge"`
+</ParamField>
+
+<ParamField body="sourceLevel4Ids" type="array" required>
+  Array of exactly 2 Level 4 UUIDs to merge. Both must:
+  - Belong to the same Level 3
+  - Be active (`isActive: true`)
+  - Belong to the user's organization
+</ParamField>
+
+<ParamField body="newCode" type="string" required>
+  Code for the resulting merged geometry
+</ParamField>
+
+<ParamField body="variationDate" type="string">
+  Date of the operation (ISO 8601 format). Defaults to current date.
+</ParamField>
+
+<ParamField body="variationNotes" type="string">
+  Notes for patrimonial variation audit trail
+</ParamField>
+
+#### Response
+
+<ResponseField name="operation" type="string">
+  Operation type: `"merge"`
+</ResponseField>
+
+<ResponseField name="sourceLevel4Ids" type="array">
+  Array of 2 UUIDs for the original (now inactive) geometries
+</ResponseField>
+
+<ResponseField name="createdLevel4Id" type="string">
+  UUID of the newly created merged geometry
+</ResponseField>
+
+#### Example: Merge Two Stands
+
+```bash cURL
+curl -X POST https://api.confor.com/api/forest/geo/operations \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "operation": "merge",
+    "sourceLevel4Ids": [
+      "660e8400-e29b-41d4-a716-446655440001",
+      "660e8400-e29b-41d4-a716-446655440002"
+    ],
+    "newCode": "N4-001-MERGED",
+    "variationDate": "2026-03-09",
+    "variationNotes": "Consolidación de rodales pequeños"
+  }'
+```
+
+```json Response
+{
+  "operation": "merge",
+  "sourceLevel4Ids": [
+    "660e8400-e29b-41d4-a716-446655440001",
+    "660e8400-e29b-41d4-a716-446655440002"
+  ],
+  "createdLevel4Id": "770e8400-e29b-41d4-a716-446655440003"
+}
+```
+
+<Warning>
+  Merged geometry name is automatically generated as `"{Name A} + {Name B}"`. Other attributes are inherited from the first source geometry.
+</Warning>
+
+---
+
+## Get Level 4 Geometry
+
+### GET `/api/forest/geo/level4?id={level4Id}`
+
+Retrieve a Level 4 geometry with its current spatial data.
+
+**Authentication:** Required  
+**Permissions:** `forest-patrimony:READ`
+
+#### Query Parameters
+
+<ParamField query="id" type="string" required>
+  UUID of the Level 4 geometry
+</ParamField>
+
+#### Response
+
+<ResponseField name="id" type="string">
+  Level 4 UUID
+</ResponseField>
+
+<ResponseField name="level2Id" type="string">
+  Parent Level 2 UUID
+</ResponseField>
+
+<ResponseField name="level3Id" type="string">
+  Parent Level 3 UUID
+</ResponseField>
+
+<ResponseField name="code" type="string">
+  Level 4 code
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Level 4 name
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Level 4 type (e.g., `RODAL`, `PARCELA`)
+</ResponseField>
+
+<ResponseField name="fscCertificateStatus" type="string">
+  FSC certification status: `SI` or `NO`
+</ResponseField>
+
+<ResponseField name="currentLandUseName" type="string">
+  Current land use
+</ResponseField>
+
+<ResponseField name="previousLandUseName" type="string">
+  Previous land use (if changed)
+</ResponseField>
+
+<ResponseField name="totalAreaHa" type="number">
+  Total area in hectares (calculated from geometry)
+</ResponseField>
+
+<ResponseField name="geometry" type="object">
+  GeoJSON geometry object (MultiPolygon in EPSG:4326)
+  
+  ```json
+  {
+    "type": "MultiPolygon",
+    "coordinates": [[[[lng, lat], ...]]]
+  }
+  ```
+</ResponseField>
+
+#### Example: Fetch Geometry
+
+```bash cURL
+curl -X GET "https://api.confor.com/api/forest/geo/level4?id=550e8400-e29b-41d4-a716-446655440000" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```json Response
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "level2Id": "org_n2_001",
+  "level3Id": "org_n3_001",
+  "code": "N4-001",
+  "name": "Rodal Principal",
+  "type": "RODAL",
+  "fscCertificateStatus": "SI",
+  "currentLandUseName": "BOSQUE",
+  "previousLandUseName": null,
+  "totalAreaHa": 15.42,
+  "geometry": {
+    "type": "MultiPolygon",
+    "coordinates": [[[[--70.5, 18.5], [-70.4, 18.5], [-70.4, 18.4], [-70.5, 18.4], [-70.5, 18.5]]]]
+  }
+}
+```
+
+---
+
+## Update Level 4 Geometry
+
+### PATCH `/api/forest/geo/level4`
+
+Update Level 4 attributes and/or geometry.
+
+**Authentication:** Required  
+**Permissions:** `forest-patrimony:UPDATE`
+
+#### Request Body
+
+<ParamField body="level4Id" type="string" required>
+  UUID of the Level 4 to update
+</ParamField>
+
+<ParamField body="code" type="string">
+  New code (must be unique within Level 3)
+</ParamField>
+
+<ParamField body="name" type="string">
+  New name
+</ParamField>
+
+<ParamField body="type" type="string">
+  New type: `RODAL`, `PARCELA`, `ENUMERATION`, `UNIDAD_DE_MANEJO`, `CONUCO`, `OTRO_USO`
+</ParamField>
+
+<ParamField body="fscCertificateStatus" type="string">
+  FSC status: `SI` or `NO`
+</ParamField>
+
+<ParamField body="currentLandUseName" type="string">
+  New land use (triggers patrimonial variation if changed)
+</ParamField>
+
+<ParamField body="previousLandUseName" type="string">
+  Previous land use for variation tracking
+</ParamField>
+
+<ParamField body="polygon" type="object">
+  New geometry (Polygon or MultiPolygon). If provided:
+  - Old geometry is marked inactive
+  - New geometry is inserted
+  - Metrics (area, centroid) are recalculated
+  - `landUseChangeDate` is updated
+</ParamField>
+
+#### Response
+
+Returns the updated Level 4 record.
+
+#### Example: Update Land Use
+
+```bash cURL
+curl -X PATCH https://api.confor.com/api/forest/geo/level4 \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "level4Id": "550e8400-e29b-41d4-a716-446655440000",
+    "currentLandUseName": "PLANTACION",
+    "previousLandUseName": "BOSQUE"
+  }'
+```
+
+---
+
+## Delete Level 4 Geometry
+
+### DELETE `/api/forest/geo/level4`
+
+Soft-delete a Level 4 geometry (marks as inactive).
+
+**Authentication:** Required  
+**Permissions:** `forest-patrimony:DELETE`
+
+#### Request Body
+
+<ParamField body="level4Id" type="string" required>
+  UUID of the Level 4 to delete
+</ParamField>
+
+#### Response
+
+<ResponseField name="message" type="string">
+  Deletion confirmation message
+</ResponseField>
+
+<Warning>
+  Cannot delete a Level 4 that has related Level 5 records. Returns `409 Conflict` if children exist.
+</Warning>
+
+---
+
+## Geospatial Processing Details
+
+### Split Operation Workflow
+
+1. **Validate Source**: Verify source Level 4 exists and is active
+2. **Cut Geometry**: Use PostGIS `ST_Intersection` and `ST_Difference` to split:
+   - Part A = Intersection of source geometry with cut geometry
+   - Part B = Difference of source geometry and cut geometry
+3. **Deactivate Source**: Mark original geometry as inactive
+4. **Create New Records**: Insert two new Level 4 records with inherited attributes
+5. **Store Geometries**: Insert new geometries into `forest_geometry_n4`
+6. **Calculate Metrics**: Compute area and centroid for both parts
+7. **Track Variations**: Create patrimonial variation records if land use changed
+
+### Merge Operation Workflow
+
+1. **Validate Sources**: Ensure both Level 4s exist, are active, and belong to same Level 3
+2. **Union Geometries**: Use PostGIS `ST_UnaryUnion(ST_Collect(...))` to merge
+3. **Deactivate Sources**: Mark both original geometries as inactive
+4. **Create New Record**: Insert merged Level 4 with combined attributes
+5. **Store Geometry**: Insert merged geometry into `forest_geometry_n4`
+6. **Calculate Metrics**: Compute area and centroid for merged geometry
+7. **Track Variation**: Create patrimonial variation record
+
+<Info>
+  All geospatial operations run within database transactions to ensure atomicity.
+</Info>
+
+---
+
+## Automated Metric Calculation
+
+Whenever a geometry is created or updated, the following metrics are automatically calculated:
+
+- **Total Area (Ha)**: Computed using PostGIS geography cast for accurate ellipsoidal calculations
+- **Centroid**: Latitude and longitude of the geometric center (EPSG:4326)
+- **Land Use Totals**: Organization-level land use surface totals are synchronized
+
+```sql Example: Area Calculation
+SELECT 
+  ST_Area(geom::geography) / 10000 AS superficie_ha,
+  ST_Y(ST_Centroid(geom)) AS lat,
+  ST_X(ST_Centroid(geom)) AS lon
+FROM forest_geometry_n4
+WHERE level4_id = '...' AND is_active = TRUE;
+```
+
+---
+
+## Patrimonial Variation Tracking
+
+All split, merge, and land use change operations automatically create records in the `LandPatrimonialVariation` table:
+
+- **Previous Land Use**: Captured before the operation
+- **New Land Use**: After the operation
+- **Affected Area (Ha)**: Calculated from geometry
+- **Variation Kind**: `INCREMENTO` (change) or `SIN_CAMBIO` (no change)
+- **Status**: Always `PENDIENTE` (pending valuation)
+- **Reference Values**: Initialized to 0, updated later by valuation process
+
+<Tip>
+  Use the Patrimonial Variations API to review and approve these tracked changes.
+</Tip>
+
+---
+
+## Error Responses
+
+| Status Code | Error | Cause |
+|-------------|-------|-------|
+| `400` | `Payload inválido` | Missing required fields or invalid geometry type |
+| `403` | `No autorizado` | Insufficient permissions or organization mismatch |
+| `404` | `Rodal no encontrado` | Level 4 ID doesn't exist or is inactive |
+| `409` | `Ya existe un rodal con ese código` | Code uniqueness violation within Level 3 |
+| `400` | `Solo se pueden consolidar rodales del mismo Nivel 3` | Merge attempted across different Level 3s |
+| `400` | `La geometría se superpone con el rodal activo` | New geometry overlaps with existing active geometry |
+
+---
+
+## Related Endpoints
+
+- [Geospatial Import](/api/geo/import) - Bulk import geometries from shapefiles
+- [Forest Patrimony](/api/patrimony/level2) - Manage forest hierarchy (Level 2/3/4/5)

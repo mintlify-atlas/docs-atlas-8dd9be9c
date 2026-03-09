@@ -1,0 +1,529 @@
+---
+title: Database Setup
+description: Configure PostgreSQL database with PostGIS extensions and Prisma migrations
+---
+
+## Overview
+
+CONFOR uses PostgreSQL 15+ with PostGIS extensions for geospatial data processing. This guide covers database setup using Docker Compose or manual installation.
+
+## Prerequisites
+
+<CardGroup cols={2}>
+  <Card title="PostgreSQL 15+" icon="database">
+    Relational database engine
+  </Card>
+  <Card title="PostGIS Extension" icon="map">
+    Spatial database capabilities
+  </Card>
+  <Card title="Redis 7+" icon="server">
+    Caching and session storage
+  </Card>
+  <Card title="Node.js 20+" icon="node">
+    For running Prisma CLI
+  </Card>
+</CardGroup>
+
+## Quick Start with Docker
+
+The fastest way to get started is using Docker Compose.
+
+### 1. Start Database Services
+
+<CodeGroup>
+
+```bash Docker Compose
+# Start PostgreSQL and Redis
+docker compose up -d
+
+# Verify services are running
+docker compose ps
+
+# Expected output:
+NAME                IMAGE                PORTS
+postgres            postgres:15-alpine   0.0.0.0:5432->5432/tcp
+redis               redis:7-alpine       0.0.0.0:6379->6379/tcp
+```
+
+```bash Check Logs
+# View PostgreSQL logs
+docker compose logs postgres
+
+# View Redis logs
+docker compose logs redis
+
+# Follow logs in real-time
+docker compose logs -f
+```
+
+```bash Stop Services
+# Stop containers (preserves data)
+docker compose stop
+
+# Stop and remove containers (preserves volumes)
+docker compose down
+
+# Remove everything including volumes (⚠️ deletes all data)
+docker compose down -v
+```
+
+</CodeGroup>
+
+### 2. Docker Compose Configuration
+
+The `docker-compose.yml` file defines the database services:
+
+```yaml docker-compose.yml
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: app_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:
+```
+
+<Note>
+Data is persisted in Docker volumes (`pgdata` and `redisdata`). Containers can be safely stopped and restarted without data loss.
+</Note>
+
+## Manual PostgreSQL Installation
+
+If you prefer not to use Docker:
+
+<Tabs>
+  <Tab title="Windows">
+    1. Download PostgreSQL 15+ from [postgresql.org](https://www.postgresql.org/download/windows/)
+    2. Run the installer and include Stack Builder
+    3. In Stack Builder, select and install PostGIS extension
+    4. Set password for `postgres` user during installation
+    5. Verify installation:
+    ```bash
+    psql --version
+    # Should show: psql (PostgreSQL) 15.x
+    ```
+  </Tab>
+  <Tab title="macOS">
+    ```bash
+    # Install PostgreSQL with Homebrew
+    brew install postgresql@15
+    brew install postgis
+    
+    # Start PostgreSQL service
+    brew services start postgresql@15
+    
+    # Create database
+    createdb app_dev
+    
+    # Verify installation
+    psql --version
+    ```
+  </Tab>
+  <Tab title="Linux (Ubuntu/Debian)">
+    ```bash
+    # Add PostgreSQL repository
+    sudo apt-get install -y postgresql-common
+    sudo sh /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh
+    
+    # Install PostgreSQL and PostGIS
+    sudo apt-get update
+    sudo apt-get install -y postgresql-15 postgresql-15-postgis-3
+    
+    # Start service
+    sudo systemctl start postgresql
+    sudo systemctl enable postgresql
+    
+    # Create database
+    sudo -u postgres createdb app_dev
+    ```
+  </Tab>
+  <Tab title="Linux (RHEL/CentOS)">
+    ```bash
+    # Install PostgreSQL repository
+    sudo dnf install -y https://download.postgresql.org/pub/repos/yum/reporpms/EL-8-x86_64/pgdg-redhat-repo-latest.noarch.rpm
+    
+    # Disable built-in PostgreSQL module
+    sudo dnf -qy module disable postgresql
+    
+    # Install PostgreSQL and PostGIS
+    sudo dnf install -y postgresql15-server postgresql15-contrib postgis33_15
+    
+    # Initialize and start
+    sudo /usr/pgsql-15/bin/postgresql-15-setup initdb
+    sudo systemctl start postgresql-15
+    sudo systemctl enable postgresql-15
+    ```
+  </Tab>
+</Tabs>
+
+## Prisma Setup
+
+### 1. Install Dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure Database URL
+
+Create a `.env` file in the project root:
+
+```bash .env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_dev"
+NEXTAUTH_SECRET="your-secret-key-min-32-characters"
+```
+
+### 3. Generate Prisma Client
+
+```bash
+npm run db:generate
+```
+
+This generates the Prisma client based on your `schema.prisma` file.
+
+### 4. Run Migrations
+
+<CodeGroup>
+
+```bash Development
+# Apply all pending migrations
+npm run db:migrate
+
+# This will:
+# - Create database tables
+# - Install PostGIS and other extensions
+# - Set up partitioning for audit_logs
+# - Create indexes and constraints
+```
+
+```bash Production
+# Deploy migrations (non-interactive)
+npx prisma migrate deploy
+
+# This is safe for production as it only applies
+# migrations without prompting for input
+```
+
+```bash Direct Push (⚠️ Development Only)
+# Push schema changes without creating migrations
+npm run db:push
+
+# Warning: This bypasses migration history
+# Only use during rapid prototyping
+```
+
+</CodeGroup>
+
+### 5. Seed Database
+
+```bash
+npm run db:seed
+```
+
+This creates:
+- Default organization (`default-org`)
+- System roles: `SUPER_ADMIN`, `ADMIN`, `MANAGER`, `USER`
+- Permissions for all modules
+- Admin user: `admin@example.com` / `Admin1234`
+- Base system configuration
+
+<Warning>
+Change the default admin password immediately after first login in production environments.
+</Warning>
+
+## Database Schema Overview
+
+### Core Tables
+
+| Table | Purpose |
+|-------|----------|
+| `User` | User accounts and authentication |
+| `Organization` | Multi-tenant organization data |
+| `Role` | Role definitions |
+| `Permission` | Granular permissions |
+| `Module` | System modules (users, dashboard, etc.) |
+| `audit_logs` | Activity audit trail (partitioned by month) |
+
+### Forest Management Tables
+
+| Table | Purpose |
+|-------|----------|
+| `PatrimonyLevel2` | Level 2 forest units (finca, predio, hato) |
+| `PatrimonyLevel3` | Level 3 forest units (lote, zona, bloque) |
+| `PatrimonyLevel4` | Level 4 forest units (rodal) - includes geometry |
+| `BiologicalAsset` | Forest biological assets |
+| `Species` | Tree and plant species |
+| `ManagementScheme` | Forest management schemes |
+| `LandUseType` | Land use classifications |
+
+### Geospatial Tables
+
+| Table | Purpose |
+|-------|----------|
+| `GeospatialImportJob` | Tracks shapefile import jobs |
+| `GeospatialRecalcJob` | Surface recalculation jobs |
+| `GeospatialVariationJob` | Geometry variation jobs |
+| `PolygonGeometry` | Stores WKB geometry data |
+
+## PostGIS Extensions
+
+The first migration installs required PostgreSQL extensions:
+
+```sql
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";     -- UUID generation
+CREATE EXTENSION IF NOT EXISTS "postgis";        -- Spatial data support
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";        -- Trigram text search
+CREATE EXTENSION IF NOT EXISTS "btree_gist";     -- Indexing support
+```
+
+## Audit Log Partitioning
+
+CONFOR uses monthly table partitioning for the `audit_logs` table to improve performance.
+
+### Automatic Partition Creation
+
+A trigger automatically creates new partitions when inserting audit logs:
+
+```sql
+CREATE OR REPLACE FUNCTION create_audit_partition()
+RETURNS TRIGGER AS $$
+DECLARE
+  partition_date TEXT;
+  partition_name TEXT;
+  start_date DATE;
+  end_date DATE;
+BEGIN
+  partition_date := TO_CHAR(NEW.created_at, 'YYYY_MM');
+  partition_name := 'audit_logs_' || partition_date;
+  start_date := DATE_TRUNC('month', NEW.created_at);
+  end_date := start_date + INTERVAL '1 month';
+  
+  -- Create partition if it doesn't exist
+  EXECUTE format(
+    'CREATE TABLE IF NOT EXISTS %I PARTITION OF audit_logs
+     FOR VALUES FROM (%L) TO (%L)',
+    partition_name, start_date, end_date
+  );
+  
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+### Manual Partition Management
+
+You can also create partitions manually using the provided script:
+
+```bash
+npx tsx scripts/create-audit-partition.ts
+```
+
+## Database Maintenance
+
+### Backup Database
+
+<CodeGroup>
+
+```bash Docker
+# Backup to SQL file
+docker compose exec postgres pg_dump -U postgres app_dev > backup_$(date +%Y%m%d).sql
+
+# Backup with compression
+docker compose exec postgres pg_dump -U postgres app_dev | gzip > backup_$(date +%Y%m%d).sql.gz
+```
+
+```bash Local PostgreSQL
+# Standard backup
+pg_dump -U postgres -d app_dev -f backup_$(date +%Y%m%d).sql
+
+# Backup with custom format (faster restore)
+pg_dump -U postgres -d app_dev -Fc -f backup_$(date +%Y%m%d).dump
+```
+
+</CodeGroup>
+
+### Restore Database
+
+<CodeGroup>
+
+```bash Docker
+# Restore from SQL file
+docker compose exec -T postgres psql -U postgres app_dev < backup.sql
+
+# Restore from compressed backup
+gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U postgres app_dev
+```
+
+```bash Local PostgreSQL
+# Restore SQL file
+psql -U postgres -d app_dev -f backup.sql
+
+# Restore custom format
+pg_restore -U postgres -d app_dev backup.dump
+```
+
+</CodeGroup>
+
+### Vacuum and Analyze
+
+Regularly optimize database performance:
+
+```sql
+-- Full vacuum (reclaim storage)
+VACUUM FULL;
+
+-- Update statistics for query planner
+ANALYZE;
+
+-- Both operations
+VACUUM FULL ANALYZE;
+
+-- Auto-vacuum specific table
+VACUUM ANALYZE audit_logs;
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Connection refused to PostgreSQL">
+    **Symptoms:** `ECONNREFUSED` or `Connection refused`
+    
+    **Solutions:**
+    ```bash
+    # Check if PostgreSQL is running
+    docker compose ps postgres
+    # or for manual installation
+    sudo systemctl status postgresql
+    
+    # Check port is listening
+    netstat -an | grep 5432
+    # or
+    ss -tulpn | grep 5432
+    
+    # Restart service
+    docker compose restart postgres
+    # or
+    sudo systemctl restart postgresql
+    ```
+  </Accordion>
+
+  <Accordion title="PostGIS extension not found">
+    **Symptoms:** `ERROR: extension "postgis" is not available`
+    
+    **Solutions:**
+    ```bash
+    # For Docker (should be included in postgres image)
+    docker compose exec postgres psql -U postgres -d app_dev -c "CREATE EXTENSION postgis;"
+    
+    # For manual installation, install PostGIS package
+    # Ubuntu/Debian:
+    sudo apt-get install postgresql-15-postgis-3
+    
+    # Then enable in database:
+    psql -U postgres -d app_dev -c "CREATE EXTENSION postgis;"
+    ```
+  </Accordion>
+
+  <Accordion title="Migration fails with permission error">
+    **Symptoms:** `permission denied to create extension`
+    
+    **Solutions:**
+    ```bash
+    # Grant superuser to your database user
+    psql -U postgres -c "ALTER USER your_user WITH SUPERUSER;"
+    
+    # Or connect as postgres user and run migrations
+    DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_dev" npx prisma migrate deploy
+    ```
+  </Accordion>
+
+  <Accordion title="Prisma client out of sync">
+    **Symptoms:** `PrismaClientInitializationError: Prisma Client could not locate the Query Engine`
+    
+    **Solutions:**
+    ```bash
+    # Regenerate Prisma client
+    npm run db:generate
+    
+    # Clear node_modules and reinstall
+    rm -rf node_modules .next
+    npm install
+    npm run db:generate
+    ```
+  </Accordion>
+
+  <Accordion title="Audit log partition missing">
+    **Symptoms:** `ERROR: no partition of relation "audit_logs" found`
+    
+    **Solutions:**
+    ```bash
+    # Manually create partition for current month
+    npx tsx scripts/create-audit-partition.ts
+    
+    # Or create via SQL
+    psql -U postgres -d app_dev <<SQL
+    CREATE TABLE IF NOT EXISTS audit_logs_2026_03 PARTITION OF audit_logs
+    FOR VALUES FROM ('2026-03-01') TO ('2026-04-01');
+    SQL
+    ```
+  </Accordion>
+
+  <Accordion title="Slow queries on large tables">
+    **Solutions:**
+    ```sql
+    -- Check missing indexes
+    SELECT schemaname, tablename, indexname
+    FROM pg_indexes
+    WHERE schemaname = 'public'
+    ORDER BY tablename, indexname;
+    
+    -- Analyze table statistics
+    ANALYZE VERBOSE PatrimonyLevel4;
+    
+    -- Check slow queries
+    SELECT query, calls, total_exec_time, mean_exec_time
+    FROM pg_stat_statements
+    ORDER BY mean_exec_time DESC
+    LIMIT 10;
+    ```
+    
+    Consider adding indexes:
+    ```sql
+    CREATE INDEX CONCURRENTLY idx_level4_org ON "PatrimonyLevel4"("organizationId");
+    CREATE INDEX CONCURRENTLY idx_level4_level3 ON "PatrimonyLevel4"("level3Id");
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="gear" href="/configuration/environment-variables">
+    Configure all environment variables
+  </Card>
+  <Card title="Worker Setup" icon="server" href="/configuration/worker-setup">
+    Set up geospatial processing workers
+  </Card>
+  <Card title="Forest Patrimony" icon="tree" href="/api/patrimony/level2">
+    Forest hierarchy data models
+  </Card>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Complete installation instructions
+  </Card>
+</CardGroup>

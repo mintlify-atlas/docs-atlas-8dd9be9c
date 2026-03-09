@@ -1,0 +1,194 @@
+---
+title: "General Configuration"
+description: "System-wide configuration management for CONFOR"
+---
+
+## Overview
+
+The General Configuration API manages system-wide settings and organization-specific configurations that don't fit into forest-specific categories.
+
+<Info>
+  This section is reserved for future configuration endpoints such as system preferences, notification settings, and organization-level defaults.
+</Info>
+
+---
+
+## Organization Settings
+
+### GET `/api/config/organization`
+
+Retrieve organization-level settings.
+
+**Authentication:** Required  
+**Permissions:** User must belong to the organization
+
+#### Response
+
+<ResponseField name="id" type="string">
+  Organization UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Organization name
+</ResponseField>
+
+<ResponseField name="code" type="string">
+  Organization code
+</ResponseField>
+
+<ResponseField name="settings" type="object">
+  Organization-specific settings (JSON object)
+</ResponseField>
+
+<ResponseField name="isActive" type="boolean">
+  Whether the organization is active
+</ResponseField>
+
+#### Example: Get Organization Settings
+
+```bash cURL
+curl -X GET https://api.confor.com/api/config/organization \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```json Response
+{
+  "id": "org_123",
+  "name": "Empresa Forestal Example",
+  "code": "EFE",
+  "settings": {
+    "defaultCurrency": "USD",
+    "defaultTimezone": "America/Santo_Domingo",
+    "fiscalYearStartMonth": 1
+  },
+  "isActive": true
+}
+```
+
+---
+
+## User Preferences
+
+### GET `/api/config/user/preferences`
+
+Retrieve current user's preferences.
+
+**Authentication:** Required
+
+#### Response
+
+<ResponseField name="userId" type="string">
+  User UUID
+</ResponseField>
+
+<ResponseField name="preferences" type="object">
+  User preference settings:
+  - `language`: Preferred language code
+  - `theme`: UI theme preference
+  - `notifications`: Notification settings
+</ResponseField>
+
+---
+
+### PATCH `/api/config/user/preferences`
+
+Update current user's preferences.
+
+**Authentication:** Required
+
+#### Request Body
+
+<ParamField body="language" type="string">
+  Preferred language: `es`, `en`, etc.
+</ParamField>
+
+<ParamField body="theme" type="string">
+  UI theme: `light`, `dark`, `auto`
+</ParamField>
+
+<ParamField body="notifications" type="object">
+  Notification preferences:
+  - `email`: Enable/disable email notifications
+  - `inApp`: Enable/disable in-app notifications
+</ParamField>
+
+---
+
+## System Configuration (Admin Only)
+
+### GET `/api/config/system`
+
+Retrieve system-wide configuration.
+
+**Authentication:** Required  
+**Permissions:** `SUPER_ADMIN` role only
+
+#### Response
+
+<ResponseField name="version" type="string">
+  Application version
+</ResponseField>
+
+<ResponseField name="environment" type="string">
+  Environment: `production`, `staging`, `development`
+</ResponseField>
+
+<ResponseField name="features" type="object">
+  Feature flags for enabled/disabled functionality
+</ResponseField>
+
+<ResponseField name="maintenance" type="object">
+  Maintenance mode settings:
+  - `enabled`: Whether maintenance mode is active
+  - `message`: Message to display during maintenance
+  - `scheduledEnd`: Estimated end time
+</ResponseField>
+
+---
+
+## Configuration Best Practices
+
+<Tip>
+  **Organization Defaults**: Set organization-level defaults (currency, timezone) to ensure consistent behavior across all users.
+</Tip>
+
+<Tip>
+  **User Preferences**: Encourage users to set language and notification preferences for personalized experience.
+</Tip>
+
+<Warning>
+  **System Configuration**: Only modify system configuration through proper change management processes. Incorrect settings can affect all users.
+</Warning>
+
+---
+
+## Future Configuration Endpoints
+
+The following endpoints are planned for future releases:
+
+- **Notification Templates** (`/api/config/notifications`)
+  - Manage email and in-app notification templates
+  - Customize messaging for different event types
+
+- **Report Templates** (`/api/config/reports`)
+  - Define custom report layouts and data sources
+  - Schedule automated report generation
+
+- **Integration Settings** (`/api/config/integrations`)
+  - Configure third-party integrations (GIS providers, accounting systems)
+  - Manage API keys and connection settings
+
+- **Workflow Rules** (`/api/config/workflows`)
+  - Define approval workflows for patrimony changes
+  - Set up automated triggers and notifications
+
+<Info>
+  Suggest additional configuration needs by contacting the CONFOR development team.
+</Info>
+
+---
+
+## Related Endpoints
+
+- [Forest Configuration](/api/config/forest-config) - Forest-specific reference data
+- [User Management](/guides/managing-users) - User account and role management

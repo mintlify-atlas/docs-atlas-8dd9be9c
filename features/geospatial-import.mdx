@@ -1,0 +1,643 @@
+---
+title: Geospatial Import
+description: Import Shapefiles to create or update Level 4 geometries with automatic area calculation and variation tracking
+---
+
+## Overview
+
+The **Geospatial Import** module enables users to upload Shapefile data to create or update Level 4 management unit geometries. The system automatically:
+
+- Extracts geometries from ZIP archives containing Shapefiles
+- Validates hierarchy codes (Level 2, 3, 4)
+- Calculates polygon areas in hectares
+- Creates geometry versions with temporal validity
+- Generates land patrimonial variations for accounting
+
+<Info>
+  CONFOR uses **PostGIS** for spatial operations and stores geometries in **WGS 84 (EPSG:4326)** coordinate system.
+</Info>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Shapefile Upload" icon="upload">
+    Upload ZIP archives containing .shp, .shx, .dbf, and .prj files
+  </Card>
+  <Card title="Auto Area Calculation" icon="calculator">
+    Automatic calculation of polygon areas in hectares
+  </Card>
+  <Card title="Temporal Versioning" icon="clock">
+    Track geometry changes over time with valid_from/valid_to
+  </Card>
+  <Card title="Variation Generation" icon="scale-balanced">
+    Automatically create land accounting variations from geometry changes
+  </Card>
+</CardGroup>
+
+## Data Model
+
+### Geometry Storage
+
+```typescript prisma/schema.prisma
+model ForestGeometryN4 {
+  id             String    @id @default(uuid())
+  organizationId String
+  level2Id       String    // Top-level property
+  level3Id       String    // Division
+  level4Id       String    // Management unit
+  
+  // PostGIS geometry columns
+  geom           Unsupported("geometry(MultiPolygon, 4326)")
+  centroid       Unsupported("geometry(Point, 4326)")
+  
+  // Calculated area
+  superficieHa   Decimal   @default(0) @db.Decimal(12, 4)
+  
+  // Temporal versioning
+  validFrom      DateTime  @default(now())
+  validTo        DateTime? // NULL = currently active
+  isActive       Boolean   @default(true)
+  
+  // Tracking
+  importJobId    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  
+  level4         ForestPatrimonyLevel4
+  importJob      GeoImportJob?
+}
+```
+
+### Import Job
+
+```typescript prisma/schema.prisma
+model GeoImportJob {
+  id               String             @id @default(uuid())
+  organizationId   String
+  status           GeoImportJobStatus @default(PENDING)
+  
+  // File info
+  fileName         String
+  storagePath      String             // Server file path
+  
+  // Processing stats
+  totalRecords     Int                @default(0)
+  processedRecords Int                @default(0)
+  failedRecords    Int                @default(0)
+  
+  metadata         Json?
+  errorMessage     String?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  createdById      String?
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  
+  items            GeoImportJobItem[]
+  geometries       ForestGeometryN4[]
+}
+
+enum GeoImportJobStatus {
+  PENDING
+  EXTRACTING   // Unzipping Shapefile
+  VALIDATING   // Checking codes and structure
+  PROCESSING   // Creating geometries
+  COMPLETED
+  FAILED
+}
+```
+
+### Import Job Item
+
+Tracks individual features from the Shapefile:
+
+```typescript prisma/schema.prisma
+model GeoImportJobItem {
+  id            String              @id @default(uuid())
+  jobId         String
+  featureIndex  Int                 // Position in Shapefile
+  status        GeoImportItemStatus
+  
+  // Extracted codes
+  level2Code    String?
+  level3Code    String?
+  level4Code    String?
+  
+  message       String?             // Error/success message
+  rawProperties Json?               // Original Shapefile attributes
+  createdAt     DateTime            @default(now())
+  
+  job           GeoImportJob
+}
+
+enum GeoImportItemStatus {
+  PROCESSED  // Successfully imported
+  FAILED     // Error occurred
+}
+```
+
+## Upload Process
+
+### User Workflow
+
+<Steps>
+  <Step title="Prepare Shapefile">
+    Create a Shapefile with Level 4 polygons containing attributes:
+    - `nivel2` or `n2`: Level 2 code
+    - `nivel3` or `n3`: Level 3 code
+    - `nivel4` or `n4`: Level 4 code
+    - `usoactual`: Current land use (optional)
+    - `usoanterior`: Previous land use (optional)
+    - `fechavariacion`: Variation date (optional)
+  </Step>
+  
+  <Step title="Create ZIP Archive">
+    Package required Shapefile components:
+    - `.shp` - Shape format (required)
+    - `.shx` - Shape index (required)
+    - `.dbf` - Attribute data (required)
+    - `.prj` - Projection info (required)
+    - `.cpg` - Character encoding (optional)
+  </Step>
+  
+  <Step title="Upload via UI">
+    Navigate to Forest → Geospatial → Import:
+    - Select ZIP file
+    - Set variation date (for land accounting)
+    - Add notes (optional)
+    - Submit upload
+  </Step>
+  
+  <Step title="Background Processing">
+    System creates import job and processes asynchronously:
+    - Extracts Shapefile
+    - Validates hierarchy codes
+    - Calculates areas
+    - Creates/updates geometries
+    - Generates variations
+  </Step>
+  
+  <Step title="Review Results">
+    Check import job status:
+    - View processed/failed record counts
+    - Review error messages
+    - Verify geometries in map viewer
+    - Process pending variations
+  </Step>
+</Steps>
+
+## API Endpoints
+
+### Download Template
+
+**GET** `/api/forest/geo/import?format=csv`
+
+Download template CSV or Excel file with sample data:
+
+```csv
+nivel2,nivel3,nivel4,usoactual,usoanterior,fechavariacion,observaciones
+N2-001,N3-001,N4-001,BOSQUE,NO BOSQUE,2024-03-15,"Cambio por actualización masiva GIS"
+```
+
+### Upload Shapefile
+
+**POST** `/api/forest/geo/import`
+
+**Content-Type:** `multipart/form-data`
+
+**Parameters:**
+- `file`: ZIP file containing Shapefile components
+- `variationDate`: Date for land accounting variations (ISO 8601)
+- `variationNotes`: Optional notes for all variations
+
+**Example using cURL:**
+
+```bash
+curl -X POST https://api.confor.example/api/forest/geo/import \
+  -H "Authorization: Bearer ${TOKEN}" \
+  -F "file=@nivel4_geometries.zip" \
+  -F "variationDate=2024-03-15" \
+  -F "variationNotes=Actualización anual de geometrías"
+```
+
+**Response:**
+
+```json
+{
+  "jobId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "PENDING",
+  "message": "Archivo recibido. El worker procesará la importación en segundo plano."
+}
+```
+
+<Note>
+  The import job is processed asynchronously. Use the returned `jobId` to check status.
+</Note>
+
+### Check Job Status
+
+**GET** `/api/forest/geo/import/[jobId]`
+
+**Response:**
+
+```json
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "COMPLETED",
+  "fileName": "nivel4_geometries.zip",
+  "totalRecords": 150,
+  "processedRecords": 145,
+  "failedRecords": 5,
+  "startedAt": "2024-03-15T10:00:00Z",
+  "completedAt": "2024-03-15T10:05:23Z",
+  "metadata": {
+    "requiredExtensions": [".shp", ".shx", ".dbf", ".prj"],
+    "variationDefaults": {
+      "variationDate": "2024-03-15",
+      "variationNotes": "Actualización anual de geometrías"
+    }
+  },
+  "items": [
+    {
+      "featureIndex": 0,
+      "status": "PROCESSED",
+      "level2Code": "N2-001",
+      "level3Code": "N3-001",
+      "level4Code": "N4-001",
+      "message": "Geometría creada exitosamente"
+    },
+    {
+      "featureIndex": 5,
+      "status": "FAILED",
+      "level2Code": "N2-001",
+      "level3Code": "N3-005",
+      "level4Code": null,
+      "message": "Código Level 4 no encontrado en atributos"
+    }
+  ]
+}
+```
+
+## Shapefile Attribute Mapping
+
+The system recognizes these attribute names (case-insensitive):
+
+| Required/Optional | Attribute Names | Description |
+|-------------------|-----------------|-------------|
+| **Required** | `nivel2`, `n2`, `level2` | Level 2 code |
+| **Required** | `nivel3`, `n3`, `level3` | Level 3 code |
+| **Required** | `nivel4`, `n4`, `level4` | Level 4 code |
+| Optional | `usoactual`, `landuse`, `uso` | Current land use |
+| Optional | `usoanterior`, `previoususe` | Previous land use |
+| Optional | `fechavariacion`, `vardate` | Variation date |
+| Optional | `observaciones`, `notes` | Notes |
+
+**Example Shapefile Attributes:**
+
+```
+FID | nivel2  | nivel3  | nivel4    | usoactual         | usoanterior
+----+---------+---------+-----------+-------------------+-------------
+1   | FIN-001 | COMP-A  | RODAL-A1  | PLANTACION PINO   | BOSQUE
+2   | FIN-001 | COMP-A  | RODAL-A2  | BOSQUE NATURAL    | BOSQUE
+3   | FIN-001 | COMP-B  | RODAL-B1  | AGROFORESTAL      | AGRICOLA
+```
+
+## Hierarchy Validation
+
+The import process validates that:
+
+1. **Level 2 exists**: Matches existing `ForestPatrimonyLevel2.code`
+2. **Level 3 exists**: Matches existing `ForestPatrimonyLevel3.code` under correct Level 2
+3. **Level 4 exists or is created**: Matches or creates `ForestPatrimonyLevel4`
+4. **Organization scope**: All codes must belong to the user's organization
+
+**Validation Flow:**
+
+```typescript
+// Pseudo-code for import validation
+for each feature in shapefile {
+  // Extract codes
+  const level2Code = feature.properties.nivel2;
+  const level3Code = feature.properties.nivel3;
+  const level4Code = feature.properties.nivel4;
+  
+  // Validate Level 2
+  const level2 = await prisma.forestPatrimonyLevel2.findFirst({
+    where: {
+      code: level2Code,
+      organizationId: userOrganizationId
+    }
+  });
+  if (!level2) {
+    markFailed("Level 2 no encontrado: " + level2Code);
+    continue;
+  }
+  
+  // Validate Level 3
+  const level3 = await prisma.forestPatrimonyLevel3.findFirst({
+    where: {
+      code: level3Code,
+      level2Id: level2.id
+    }
+  });
+  if (!level3) {
+    markFailed("Level 3 no encontrado: " + level3Code);
+    continue;
+  }
+  
+  // Get or create Level 4
+  const level4 = await getOrCreateLevel4(level3.id, level4Code);
+  
+  // Create geometry
+  await createGeometry(feature.geometry, level4.id);
+  markProcessed();
+}
+```
+
+## Area Calculation
+
+Areas are automatically calculated from polygon geometries:
+
+```sql
+-- PostGIS area calculation (in square meters, converted to hectares)
+UPDATE forest_geometry_n4
+SET superficie_ha = ST_Area(geom::geography) / 10000
+WHERE id = $1;
+```
+
+**Key points:**
+- Uses `geography` type for accurate area on ellipsoid
+- Result in square meters, divided by 10,000 for hectares
+- Precision up to 4 decimal places (0.0001 ha = 1 m²)
+
+## Temporal Versioning
+
+Each geometry import creates a new version:
+
+### Creating New Version
+
+```sql
+-- Deactivate current version
+UPDATE forest_geometry_n4
+SET is_active = FALSE,
+    valid_to = NOW()
+WHERE level4_id = $1
+  AND is_active = TRUE;
+
+-- Insert new version
+INSERT INTO forest_geometry_n4 (
+  organization_id, level2_id, level3_id, level4_id,
+  geom, centroid, superficie_ha,
+  valid_from, valid_to, is_active, import_job_id
+)
+VALUES (
+  $1, $2, $3, $4,
+  ST_Multi(ST_GeomFromGeoJSON($5)),
+  ST_Centroid(ST_GeomFromGeoJSON($5)),
+  0, -- Will be calculated
+  NOW(), NULL, TRUE, $6
+);
+```
+
+### Querying Current Geometries
+
+```typescript
+// Get active geometry for Level 4 unit
+const geometry = await prisma.$queryRaw`
+  SELECT
+    id,
+    ST_AsGeoJSON(geom) as geometry,
+    ST_AsGeoJSON(centroid) as centroid,
+    superficie_ha,
+    valid_from,
+    valid_to
+  FROM forest_geometry_n4
+  WHERE level4_id = ${level4Id}::uuid
+    AND is_active = TRUE
+  LIMIT 1
+`;
+```
+
+### Querying Historical Geometries
+
+```typescript
+// Get all versions for Level 4 unit
+const history = await prisma.$queryRaw`
+  SELECT
+    id,
+    superficie_ha,
+    valid_from,
+    valid_to,
+    is_active,
+    import_job_id
+  FROM forest_geometry_n4
+  WHERE level4_id = ${level4Id}::uuid
+  ORDER BY valid_from DESC
+`;
+```
+
+## Automatic Variation Generation
+
+When geometries are imported with land use data, the system generates patrimonial variations:
+
+```typescript src/app/api/forest/geo/import/route.ts
+const job = await prisma.geoImportJob.create({
+  data: {
+    organizationId,
+    fileName: file.name,
+    storagePath: "",
+    metadata: {
+      variationDefaults: {
+        variationDate: parsedVariationDate,
+        variationNotes: variationNotes || null,
+      },
+    },
+  },
+});
+```
+
+During processing:
+1. Compare `usoanterior` (previous) vs `usoactual` (current)
+2. If different, create `LandPatrimonialVariation` with status `PENDIENTE`
+3. Calculate area from geometry
+4. Apply default variation date and notes from import job
+5. User later processes variations to update Level 4 land use
+
+See [Land Accounting](./land-accounting) for variation processing details.
+
+## Geometry Recalculation Jobs
+
+When Level 4 units are modified, geometry recalculation jobs can be queued:
+
+```typescript prisma/schema.prisma
+model ForestGeometryRecalcJob {
+  id             String             @id @default(uuid())
+  organizationId String
+  level4Id       String
+  status         GeoRecalcJobStatus @default(PENDING)
+  attempts       Int                @default(0)
+  runAfter       DateTime           @default(now())
+  lastError      String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  
+  level4         ForestPatrimonyLevel4
+}
+
+enum GeoRecalcJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+```
+
+**Triggered when:**
+- Level 4 totalAreaHa is updated
+- Level 4 is activated/deactivated
+- Hierarchy changes affect Level 4
+
+```typescript src/app/api/forest/patrimony/route.ts
+void enqueueLevel4RecalcJob({
+  organizationId,
+  level4Id: updated.id,
+  createdById: authResult.session.user.id,
+});
+```
+
+## Map Visualization
+
+View imported geometries on interactive map:
+
+**GET** `/api/forest/geo/layers/nivel4`
+
+Returns GeoJSON for all Level 4 geometries in the organization:
+
+```json
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "geometry": {
+        "type": "MultiPolygon",
+        "coordinates": [[[[-66.9, 10.5], [-66.8, 10.5], ...]]]
+      },
+      "properties": {
+        "level4Code": "RODAL-A1",
+        "level4Name": "Rodal A1",
+        "level3Code": "COMP-A",
+        "level2Code": "FIN-001",
+        "areaHa": 45.50,
+        "landUse": "PLANTACION PINO"
+      }
+    }
+  ]
+}
+```
+
+## Error Handling
+
+### Common Errors
+
+<AccordionGroup>
+  <Accordion title="Missing Shapefile Components">
+    **Error:** `ZIP incompleto. Faltan archivos obligatorios: .prj`
+    
+    **Solution:** Ensure ZIP contains .shp, .shx, .dbf, and .prj files
+  </Accordion>
+  
+  <Accordion title="Invalid Hierarchy Codes">
+    **Error:** `Level 3 no encontrado: COMP-Z`
+    
+    **Solution:** Verify codes exist in database and match parent hierarchy
+  </Accordion>
+  
+  <Accordion title="Coordinate System Mismatch">
+    **Error:** `Invalid projection. Expected EPSG:4326`
+    
+    **Solution:** Reproject Shapefile to WGS 84 (EPSG:4326) before upload
+  </Accordion>
+  
+  <Accordion title="Attribute Name Not Recognized">
+    **Error:** `Código Level 4 no encontrado en atributos`
+    
+    **Solution:** Use recognized attribute names (nivel4, n4, or level4)
+  </Accordion>
+</AccordionGroup>
+
+### Partial Success
+
+Jobs can complete with some records failed:
+
+```json
+{
+  "status": "COMPLETED",
+  "totalRecords": 150,
+  "processedRecords": 145,
+  "failedRecords": 5
+}
+```
+
+Review failed items to correct data and re-import.
+
+## Best Practices
+
+<Steps>
+  <Step title="Prepare Clean Data">
+    - Validate Shapefile in QGIS/ArcGIS before upload
+    - Check for topology errors (gaps, overlaps)
+    - Ensure attribute names match expected fields
+    - Use consistent code formatting
+  </Step>
+  
+  <Step title="Use Correct Projection">
+    - Always use WGS 84 (EPSG:4326)
+    - Verify .prj file contains correct definition
+    - Reproject if necessary using GIS software
+  </Step>
+  
+  <Step title="Test with Subset">
+    - Upload small sample (5-10 features) first
+    - Verify geometry and attributes correct
+    - Review generated variations
+    - Scale up to full dataset
+  </Step>
+  
+  <Step title="Document Imports">
+    - Use descriptive file names (e.g., `2024-Q1-nivel4-update.zip`)
+    - Add detailed notes to variation fields
+    - Keep source Shapefiles for reference
+    - Log import dates and purposes
+  </Step>
+  
+  <Step title="Review Results">
+    - Check job status after upload
+    - Review failed items and correct errors
+    - Visualize geometries on map
+    - Process pending variations promptly
+  </Step>
+</Steps>
+
+<Warning>
+  **Data Quality Warnings**
+  - Large files (>50 MB) may take several minutes to process
+  - Geometry errors in Shapefile will cause import failures
+  - Organization must have existing Level 2 and Level 3 units
+  - Invalid variation dates will be rejected
+</Warning>
+
+<Tip>
+  **Performance Tips**
+  - Simplify complex geometries to reduce file size
+  - Split very large imports into batches
+  - Process during off-peak hours for large datasets
+  - Use geometry recalc jobs for bulk updates
+</Tip>
+
+## Related Documentation
+
+- [Forest Patrimony](./forest-patrimony) - Understanding the hierarchy
+- [Land Accounting](./land-accounting) - Processing variations generated from imports
+- [API Reference](/api/geo/import) - Geospatial API endpoints

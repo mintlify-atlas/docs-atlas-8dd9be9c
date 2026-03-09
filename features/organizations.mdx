@@ -1,0 +1,426 @@
+---
+title: Organizations
+description: Multi-tenant organization management with hierarchical data isolation and custom configurations
+---
+
+## Overview
+
+CONFOR implements a multi-tenant architecture where all forestry data is scoped to **Organizations**. Each organization represents a distinct entity (company, government agency, or institution) managing their own forest patrimony, with complete data isolation and customizable settings.
+
+## Key Capabilities
+
+<CardGroup cols={2}>
+  <Card title="Data Isolation" icon="lock">
+    Complete data segregation between organizations for security and compliance
+  </Card>
+  <Card title="Custom Branding" icon="palette">
+    Organization-specific logos and visual identity
+  </Card>
+  <Card title="Geographic Association" icon="earth-americas">
+    Link organizations to countries for regional compliance
+  </Card>
+  <Card title="Flexible Settings" icon="sliders">
+    JSON-based configuration for organization-specific parameters
+  </Card>
+</CardGroup>
+
+## Data Model
+
+### Organization Schema
+
+```typescript prisma/schema.prisma
+model Organization {
+  id                         String    @id @default(uuid())
+  name                       String
+  slug                       String    @unique
+  description                String?
+  logoUrl                    String?
+  countryId                  String?
+  website                    String?
+  isActive                   Boolean   @default(true)
+  settings                   Json?     // Custom configuration
+  createdAt                  DateTime  @default(now())
+  updatedAt                  DateTime  @updatedAt
+  deletedAt                  DateTime? // Soft delete
+  
+  // Relations
+  users                      User[]
+  roles                      Role[]
+  forestPatrimonyLevel2Units ForestPatrimonyLevel2[]
+  species                    Species[]
+  landPatrimonialVariations  LandPatrimonialVariation[]
+}
+```
+
+### Settings Structure
+
+The `settings` field is a flexible JSON object that can store:
+
+- **RIF/Tax ID**: Organization tax identification
+- **Custom parameters**: Industry-specific configurations
+- **Regional settings**: Locale and timezone preferences
+
+```typescript src/app/api/organizations/route.ts
+const created = await prisma.organization.create({
+  data: {
+    name: parsed.data.name,
+    slug,
+    countryId: parsed.data.countryId || null,
+    settings: { rif: parsed.data.rif },
+  },
+});
+```
+
+## Creating Organizations
+
+### User Workflow
+
+<Steps>
+  <Step title="Access Organization Management">
+    Navigate to Admin → Organizations (requires ADMIN or SUPER_ADMIN role)
+  </Step>
+  <Step title="Create New Organization">
+    Click "New Organization" and fill in required details:
+    - Organization name
+    - RIF/Tax ID
+    - Country association (optional)
+  </Step>
+  <Step title="Configure Settings">
+    Set up organization-specific parameters and branding
+  </Step>
+  <Step title="Assign Users">
+    Add users to the organization and grant appropriate roles
+  </Step>
+</Steps>
+
+### API Endpoint
+
+**POST** `/api/organizations`
+
+```typescript src/validations/organization.schema.ts
+export const createOrganizationSchema = z.object({
+  name: z.string().min(2).max(255),
+  rif: z.string().min(2).max(60),
+  countryId: z.string().uuid().optional().or(z.literal("")),
+});
+```
+
+### Example Request
+
+```json
+{
+  "name": "Corporación Forestal del Sur",
+  "rif": "J-12345678-9",
+  "countryId": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+<Note>
+  Only **SUPER_ADMIN** users can create new organizations. **ADMIN** users can only view and edit their own organization.
+</Note>
+
+## Permission Scoping
+
+### Role-Based Access
+
+CONFOR implements strict role-based access control:
+
+```typescript src/app/api/organizations/route.ts
+function isSuperAdmin(roles: string[]) {
+  return roles.includes("SUPER_ADMIN");
+}
+
+function isScopedAdmin(roles: string[]) {
+  return roles.includes("ADMIN") && !isSuperAdmin(roles);
+}
+
+export async function GET() {
+  const organizations = await prisma.organization.findMany({
+    where: {
+      deletedAt: null,
+      // Scoped admins only see their organization
+      ...(isScopedAdmin(roles) ? { id: organizationId } : {}),
+    },
+  });
+}
+```
+
+### Access Matrix
+
+| Action | SUPER_ADMIN | ADMIN | USER |
+|--------|-------------|-------|------|
+| Create Organization | ✅ | ❌ | ❌ |
+| View All Organizations | ✅ | ❌ | ❌ |
+| View Own Organization | ✅ | ✅ | ✅ |
+| Edit Own Organization | ✅ | ✅ | ❌ |
+| Delete Organization | ✅ | ❌ | ❌ |
+| Manage Users | ✅ | ✅ (own org) | ❌ |
+
+## Organization Hierarchy
+
+Each organization can manage:
+
+<Tabs>
+  <Tab title="Users & Roles">
+    - User accounts scoped to the organization
+    - Custom roles with granular permissions
+    - Role assignments and access control
+  </Tab>
+  <Tab title="Forest Data">
+    - Forest patrimony hierarchy (Level 2-5)
+    - Biological assets and inventory data
+    - Land use variations and accounting
+    - Geospatial geometries
+  </Tab>
+  <Tab title="Catalogs">
+    - Species and genetic materials
+    - Land use types
+    - Management schemes
+    - IMA classes
+    - Spacing configurations
+  </Tab>
+  <Tab title="System Settings">
+    - Organization-specific configurations
+    - Dashboard widgets and layouts
+    - Notification preferences
+  </Tab>
+</Tabs>
+
+## Data Isolation
+
+All queries automatically filter by organization:
+
+```typescript src/app/api/forest/patrimony/route.ts
+const where: Prisma.ForestPatrimonyLevel2WhereInput = {
+  // Super admins see all, others see only their org
+  ...(!isSuperAdmin ? { organizationId: organizationId ?? "" } : {}),
+  ...(search ? {
+    OR: [
+      { code: { contains: search, mode: "insensitive" } },
+      { name: { contains: search, mode: "insensitive" } },
+    ],
+  } : {}),
+};
+```
+
+### Cascading Filters
+
+For nested resources, organization filters cascade down:
+
+```typescript src/app/api/forest/patrimony/route.ts
+// Level 4 query - filters through Level 3 → Level 2 → Organization
+const where: Prisma.ForestPatrimonyLevel4WhereInput = {
+  ...(parentId ? { level3Id: parentId } : {}),
+  ...(!isSuperAdmin ? {
+    level3: {
+      level2: {
+        organizationId: organizationId ?? ""
+      }
+    }
+  } : {}),
+};
+```
+
+## Organization Settings
+
+### Active Status
+
+Organizations can be activated or deactivated:
+
+```typescript prisma/schema.prisma
+model Organization {
+  isActive  Boolean   @default(true)
+  deletedAt DateTime? // Soft delete timestamp
+}
+```
+
+**Effects of Deactivation:**
+- Users cannot log in
+- API requests return authorization errors
+- Data remains intact for potential reactivation
+
+### Soft Delete
+
+Organizations are soft-deleted (never permanently removed):
+
+```typescript
+// Organizations with deletedAt timestamp are hidden
+where: {
+  deletedAt: null
+}
+```
+
+## Branding & Customization
+
+### Organization Logo
+
+**POST** `/api/organizations/logo`
+
+Upload organization logos for custom branding:
+
+- Supported formats: PNG, JPG, SVG
+- Recommended size: 200x200px
+- Stored in `logoUrl` field
+
+### Country Association
+
+Organizations can be linked to countries:
+
+```typescript prisma/schema.prisma
+model Organization {
+  countryId String?
+  country   Country? @relation(fields: [countryId], references: [id])
+}
+```
+
+This enables:
+- Regional compliance settings
+- Localized land use types
+- Geographic reporting
+
+## Managing Organizations
+
+### Listing Organizations
+
+**GET** `/api/organizations`
+
+Returns paginated list of organizations:
+
+```json
+{
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Corporación Forestal del Sur",
+      "rif": "J-12345678-9",
+      "countryId": "...",
+      "createdAt": "2024-01-15T10:00:00Z"
+    }
+  ]
+}
+```
+
+### Updating Organizations
+
+**PATCH** `/api/organizations/[id]`
+
+Update organization details:
+
+```json
+{
+  "name": "Nueva Corporación Forestal",
+  "website": "https://ejemplo.com",
+  "description": "Empresa líder en manejo forestal sostenible"
+}
+```
+
+### Restoring Organizations
+
+**POST** `/api/organizations/[id]/restore`
+
+Restore a soft-deleted organization:
+
+```typescript
+await prisma.organization.update({
+  where: { id },
+  data: { deletedAt: null, isActive: true },
+});
+```
+
+## Import/Export
+
+### Bulk Import
+
+**POST** `/api/organizations/import`
+
+Import multiple organizations from CSV/Excel:
+
+**Required columns:**
+- `name`: Organization name
+- `rif`: Tax identification number
+- `countryId`: UUID of associated country (optional)
+
+### Bulk Export
+
+**GET** `/api/organizations/export`
+
+Export all organizations to CSV/Excel format.
+
+## System Configuration
+
+Organizations can have custom system configurations:
+
+```typescript prisma/schema.prisma
+model SystemConfiguration {
+  id             String        @id @default(uuid())
+  organizationId String?
+  category       String        // e.g., "accounting", "geospatial"
+  key            String        // e.g., "currency", "coordinate_system"
+  value          String?
+  configType     ConfigType    @default(STRING)
+  isPublic       Boolean       @default(false)
+  isEditable     Boolean       @default(true)
+  
+  organization   Organization? @relation(fields: [organizationId])
+}
+```
+
+### Configuration Categories
+
+- **Accounting**: Currency, valuation methods
+- **Geospatial**: Coordinate systems, precision settings
+- **Reporting**: Date formats, language preferences
+- **Security**: Session timeout, password policies
+
+## Default Organization
+
+During user registration, a default organization is created:
+
+```typescript src/app/api/auth/register/route.ts
+const defaultOrgName = "Por defecto";
+const defaultOrgSlug = generateSlug(defaultOrgName);
+const organization = await prisma.organization.upsert({
+  where: { slug: defaultOrgSlug },
+  update: {},
+  create: {
+    name: defaultOrgName,
+    slug: defaultOrgSlug,
+    isActive: true,
+  },
+});
+```
+
+<Warning>
+  The default organization is automatically created for demo/testing purposes. In production, create specific organizations for each tenant.
+</Warning>
+
+## Best Practices
+
+<Steps>
+  <Step title="Plan Organization Structure">
+    Define your organization hierarchy before importing data. Consider subsidiaries, departments, or regional offices.
+  </Step>
+  <Step title="Use Meaningful Slugs">
+    Slugs are auto-generated from names but should be unique and descriptive.
+  </Step>
+  <Step title="Configure Settings Early">
+    Set up tax IDs, country associations, and custom parameters before users begin data entry.
+  </Step>
+  <Step title="Regular Audits">
+    Review organization access logs and user permissions quarterly.
+  </Step>
+</Steps>
+
+<Tip>
+  **Multi-tenant Best Practices**
+  - Use soft deletes to maintain audit trails
+  - Implement organization-specific backups
+  - Test permission scoping thoroughly
+  - Document custom settings in organization descriptions
+</Tip>
+
+## Related Documentation
+
+- [Authentication](./authentication) - User authentication and access control
+- [Forest Patrimony](./forest-patrimony) - Managing forest hierarchy within organizations
+- [API Reference](/api/organizations/list) - Organization API endpoints

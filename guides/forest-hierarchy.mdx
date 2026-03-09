@@ -1,0 +1,581 @@
+---
+title: Forest Hierarchy
+description: Understand CONFOR's 5-level forest patrimony structure and how to manage it
+---
+
+# Forest Hierarchy
+
+CONFOR organizes forest patrimony data using a hierarchical 5-level structure, from large land holdings down to individual sampling plots. This guide explains each level, their relationships, and how to manage them.
+
+## Overview
+
+The forest patrimony hierarchy in CONFOR follows this structure:
+
+```
+Level 1: Organization (implied, not a data level)
+  └─ Level 2: Finca/Predio/Hacienda (major land holding)
+      └─ Level 3: Lote/Compartimiento (subdivision)
+          └─ Level 4: Rodal/Parcela (forest stand/plot)
+              └─ Level 5: Subunidad/Muestra (sample point)
+```
+
+Each level serves a specific purpose in forestry accounting and inventory management.
+
+## Level 2: Major Land Holdings
+
+**Database table**: `ForestPatrimonyLevel2`
+
+**Purpose**: Represents the highest-level land ownership unit, such as a farm, estate, or protected area.
+
+### Level 2 Types
+
+From `PatrimonyLevel2Type` enum:
+
+- `FINCA` - Farm
+- `PREDIO` - Land property
+- `HATO` - Ranch
+- `FUNDO` - Estate
+- `HACIENDA` - Large estate
+- `ABRAE` - Protected natural area (Venezuela-specific)
+
+### Level 2 Attributes
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | Unique identifier (e.g., `FINCA-01`) |
+| `name` | string | Display name (e.g., `Finca El Bosque`) |
+| `type` | enum | One of the types above |
+| `legalStatus` | enum | Legal ownership status (see below) |
+| `totalAreaHa` | decimal | Total area in hectares |
+| `centroidLatitude` | decimal | Geographic center latitude |
+| `centroidLongitude` | decimal | Geographic center longitude |
+| `ownerRepresentative` | string | Legal representative name |
+| `publicRegistryNumber` | string | Public registry identifier |
+| `publicRegistryDate` | date | Registration date |
+| `address` | string | Physical address |
+| `lastInfoDate` | date | Last information update |
+| `isActive` | boolean | Whether this unit is active |
+
+### Legal Status Options
+
+From `LegalStatus` enum:
+
+- `ADQUISICION` - Acquisition/Purchase
+- `ARRIENDO` - Lease/Rent
+- `USUFRUCTO` - Usufruct (right to use)
+- `COMODATO` - Loan for use
+- `DECRETO` - Government decree
+
+### Managing Level 2 Units
+
+<Steps>
+  <Step title="Navigate to Forest Patrimony">
+    Go to **Patrimonio Forestal** in the main navigation.
+    
+    The page displays tabs for Nivel 2, Nivel 3, Nivel 4, and Nivel 5.
+  </Step>
+  
+  <Step title="Create a New Level 2 Unit">
+    In the **Nivel 2** tab, fill in the creation form:
+    
+    - **Código**: Unique code (e.g., `FINCA-01`)
+    - **Nombre**: Display name (e.g., `Finca El Bosque`)
+    - **Tipo**: Select type (FINCA, PREDIO, etc.)
+    - **Estado Legal**: Select legal status
+    - **Superficie Total (ha)**: Area in hectares
+    
+    Click **Crear Nivel 2** to save.
+  </Step>
+  
+  <Step title="Edit an Existing Unit">
+    Click the **Editar** button next to the unit in the table.
+    
+    Modify the form fields, then click **Guardar cambios**.
+  </Step>
+  
+  <Step title="Delete a Unit">
+    Click **Eliminar** next to the unit.
+    
+    <Warning>
+      Deleting a Level 2 unit will cascade delete all child Level 3, 4, and 5 units. This action cannot be undone.
+    </Warning>
+  </Step>
+</Steps>
+
+### Neighbors (Colindantes)
+
+Level 2 units can have associated neighbors/adjacent properties:
+
+**Purpose**: Track boundary relationships for legal and planning purposes.
+
+**Attributes**:
+- `code`: Neighbor identifier
+- `name`: Neighbor name
+- `type`: Relationship type (e.g., "Colindante", "Vecino")
+
+**Management**:
+- View neighbors when a Level 2 unit is selected
+- Add/edit/delete neighbors using the Colindantes section
+
+## Level 3: Subdivisions
+
+**Database table**: `ForestPatrimonyLevel3`
+
+**Purpose**: Represents subdivisions within a Level 2 unit, used for management and operational planning.
+
+### Level 3 Types
+
+From `PatrimonyLevel3Type` enum:
+
+- `COMPARTIMIENTO` - Compartment
+- `BLOCK` - Block
+- `SECCION` - Section
+- `LOTE` - Lot
+- `ZONA` - Zone
+- `BLOQUE` - Block (Spanish)
+- `ZONIFICACION` - Zoning
+
+### Level 3 Attributes
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | Unique within parent Level 2 (e.g., `LOTE-01`) |
+| `name` | string | Display name |
+| `type` | enum | One of the types above |
+| `totalAreaHa` | decimal | Area in hectares |
+| `centroidLatitude` | decimal | Center latitude |
+| `centroidLongitude` | decimal | Center longitude |
+| `lastInfoDate` | date | Last update |
+| `isActive` | boolean | Active status |
+
+### Managing Level 3 Units
+
+<Steps>
+  <Step title="Select Parent Level 2">
+    In the **Nivel 2** tab, click on a Level 2 unit to select it.
+    
+    The **Nivel 3** tab becomes active and shows Level 3 units belonging to the selected Level 2.
+  </Step>
+  
+  <Step title="Create a Level 3 Unit">
+    Switch to the **Nivel 3** tab.
+    
+    Fill in:
+    - **Código**: Unique within this Level 2 (e.g., `LOTE-01`)
+    - **Nombre**: Display name
+    - **Tipo**: Select type (LOTE, COMPARTIMIENTO, etc.)
+    - **Superficie Total (ha)**: Area in hectares
+    
+    Click **Crear Nivel 3**.
+  </Step>
+  
+  <Step title="Edit/Delete">
+    Use the **Editar** and **Eliminar** buttons as with Level 2.
+    
+    <Warning>
+      Deleting a Level 3 unit cascades to child Level 4 and 5 units.
+    </Warning>
+  </Step>
+</Steps>
+
+## Level 4: Forest Stands (Rodales)
+
+**Database table**: `ForestPatrimonyLevel4`
+
+**Purpose**: Represents individual forest stands or management units where actual forestry operations occur.
+
+### Level 4 Types
+
+From `PatrimonyLevel4Type` enum:
+
+- `RODAL` - Stand (forest unit)
+- `PARCELA` - Plot
+- `ENUMERATION` - Enumeration unit
+- `UNIDAD_DE_MANEJO` - Management unit
+- `CONUCO` - Small farm plot
+- `OTRO_USO` - Other use
+
+### Level 4 Attributes
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | Unique within parent Level 3 (e.g., `RODAL-001`) |
+| `name` | string | Display name |
+| `type` | enum | One of the types above |
+| `fscCertificateStatus` | enum | FSC certification (SI/NO) |
+| `currentLandUseName` | string | Current land use classification |
+| `previousLandUseName` | string | Previous land use (before change) |
+| `landUseChangeDate` | date | Date of last land use change |
+| `totalAreaHa` | decimal | Area in hectares |
+| `plantableAreaHa` | decimal | Plantable area subset |
+| `rotationPhase` | string | Rotation phase (e.g., "First Rotation") |
+| `previousUse` | string | Historical use notes |
+| `centroidLatitude` | decimal | Center latitude |
+| `centroidLongitude` | decimal | Center longitude |
+| `lastInfoDate` | date | Last update |
+| `isActive` | boolean | Active status |
+
+### FSC Certification
+
+From `FscCertificateStatus` enum:
+- `SI` - Yes, FSC certified
+- `NO` - Not certified
+
+### Managing Level 4 Units
+
+<Steps>
+  <Step title="Select Parent Level 3">
+    In the **Nivel 3** tab, click on a Level 3 unit.
+    
+    The **Nivel 4** tab becomes active.
+  </Step>
+  
+  <Step title="Create a Level 4 Unit">
+    Switch to the **Nivel 4** tab.
+    
+    Fill in:
+    - **Código**: Unique within this Level 3 (e.g., `RODAL-001`)
+    - **Nombre**: Display name
+    - **Tipo**: Select type (RODAL, PARCELA, etc.)
+    - **Estado FSC**: Select SI or NO
+    - **Superficie Total (ha)**: Area in hectares
+    
+    Click **Crear Nivel 4**.
+  </Step>
+  
+  <Step title="Import via Shapefile">
+    Level 4 units can also be bulk-imported with geospatial data.
+    
+    See [Importing Shapefiles](/guides/importing-shapefiles) for details.
+  </Step>
+</Steps>
+
+### Geometry Versions
+
+Level 4 units are linked to geospatial geometries in `ForestGeometryN4`:
+
+**Purpose**: Store polygon boundaries with temporal versioning.
+
+**Key fields**:
+- `geom`: MultiPolygon geometry (EPSG:4326)
+- `centroid`: Calculated centroid point
+- `superficieHa`: Calculated area in hectares
+- `validFrom`: Start of validity period
+- `validTo`: End of validity (null if current)
+- `isActive`: True for current geometry version
+- `importJobId`: Reference to import job that created this version
+
+**Versioning**: When a new geometry is imported for an existing Level 4 unit:
+1. Previous geometry: Set `isActive = false`, `validTo = now()`
+2. New geometry: Create with `isActive = true`, `validFrom = now()`
+
+This maintains a history of boundary changes over time.
+
+## Level 5: Sample Points
+
+**Database table**: `ForestPatrimonyLevel5`
+
+**Purpose**: Represents individual sampling locations within Level 4 units, used for detailed inventory and research.
+
+### Level 5 Types
+
+From `PatrimonyLevel5Type` enum:
+
+- `REFERENCIA` - Reference point
+- `SUBUNIDAD` - Subunit
+- `SUBPARCELA` - Subplot
+- `MUESTRA` - Sample
+- `SUBMUESTRA` - Subsample
+
+### Plot Shape Types
+
+From `PlotShapeType` enum:
+
+- `RECTANGULAR` - Rectangular plot
+- `CUADRADA` - Square plot
+- `CIRCULAR` - Circular plot
+- `HEXAGONAL` - Hexagonal plot
+
+### Level 5 Attributes
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `code` | string | Unique within parent Level 4 (e.g., `SUBP-001`) |
+| `name` | string | Display name |
+| `type` | enum | One of the types above |
+| `shapeType` | enum | Plot shape (RECTANGULAR, etc.) |
+| `dimension1M` | decimal | First dimension in meters |
+| `dimension2M` | decimal | Second dimension in meters |
+| `dimension3M` | decimal | Third dimension in meters (optional) |
+| `dimension4M` | decimal | Fourth dimension in meters (optional) |
+| `areaM2` | decimal | Area in square meters |
+| `centroidLatitude` | decimal | Center latitude |
+| `centroidLongitude` | decimal | Center longitude |
+| `lastInfoDate` | date | Last update |
+| `isActive` | boolean | Active status |
+
+<Info>
+  Dimensions are interpreted based on `shapeType`:
+  - **RECTANGULAR**: `dimension1M` = length, `dimension2M` = width
+  - **CIRCULAR**: `dimension1M` = radius
+  - **HEXAGONAL**: `dimension1M` = side length
+</Info>
+
+### Managing Level 5 Units
+
+<Steps>
+  <Step title="Select Parent Level 4">
+    In the **Nivel 4** tab, click on a Level 4 unit.
+    
+    The **Nivel 5** tab becomes active.
+  </Step>
+  
+  <Step title="Create a Level 5 Unit">
+    Switch to the **Nivel 5** tab.
+    
+    Fill in:
+    - **Código**: Unique within this Level 4
+    - **Nombre**: Display name
+    - **Tipo**: Select type (SUBUNIDAD, MUESTRA, etc.)
+    - **Forma**: Select shape type
+    - **Dimensiones**: Enter dimensions in meters
+    
+    Click **Crear Nivel 5**.
+    
+    <Note>
+      Area (`areaM2`) is calculated automatically based on shape and dimensions.
+    </Note>
+  </Step>
+</Steps>
+
+## Hierarchy Navigation
+
+The Patrimonio Forestal page uses a **cascading selection** model:
+
+1. **Select Level 2** → Level 3 table populates with children
+2. **Select Level 3** → Level 4 table populates with children
+3. **Select Level 4** → Level 5 table populates with children
+
+This ensures data is always displayed in context of its parent unit.
+
+### Breadcrumb Display
+
+At the top of each tab, CONFOR shows the current selection path:
+
+```
+FINCA-01 (Finca El Bosque) → LOTE-01 (Lote Norte) → RODAL-001 (Rodal A)
+```
+
+This helps users understand where they are in the hierarchy.
+
+## Searching and Filtering
+
+Each level has independent search and pagination:
+
+### Search
+
+- Searches by `code` and `name` fields
+- Partial match, case-insensitive
+- Real-time filtering as you type (300ms debounce)
+
+### Sorting
+
+Click column headers to sort:
+- **Level 2**: Code, Name, Type, Total Area, Legal Status, Active Status
+- **Level 3**: Code, Name, Type, Total Area, Active Status
+- **Level 4**: Code, Name, Type, Total Area, FSC Status, Active Status
+- **Level 5**: Code, Name, Type, Shape Type, Area (m²), Active Status
+
+### Pagination
+
+- **Items per page**: 10, 25, 50, 100
+- **Previous/Next** navigation
+- **Total count** displayed
+
+Each level maintains its own page state, so you can browse Level 2 on page 3 while viewing Level 3 on page 1.
+
+## Importing/Exporting Hierarchy Data
+
+All hierarchy levels support bulk import/export:
+
+### Export
+
+<Steps>
+  <Step title="Configure Export">
+    For each level, set:
+    - **Límite de exportación**: Max records (default: 100)
+    - **Search filters**: Narrow down records
+  </Step>
+  
+  <Step title="Choose Format">
+    Click **Exportar CSV** or **Exportar Excel**.
+  </Step>
+  
+  <Step title="Download File">
+    File downloads with a name like `patrimonio_nivel2.csv`.
+  </Step>
+</Steps>
+
+### Import
+
+<Steps>
+  <Step title="Prepare File">
+    Create a CSV or Excel file with columns matching the level's attributes.
+    
+    Example for Level 3:
+    ```csv
+    code,name,type,totalAreaHa
+    LOTE-01,Lote Norte,LOTE,50.5
+    LOTE-02,Lote Sur,LOTE,48.3
+    ```
+  </Step>
+  
+  <Step title="Click Import">
+    For each level, click the **Importar** button.
+  </Step>
+  
+  <Step title="Select Parent (if applicable)">
+    For Level 3/4/5, ensure the correct parent unit is selected before importing.
+  </Step>
+  
+  <Step title="Upload File">
+    Choose your file and upload.
+    
+    CONFOR displays:
+    - **Creados**: New units created
+    - **Actualizados**: Existing units updated
+    - **Omitidos**: Duplicate codes skipped
+    - **Errores**: Validation failures
+  </Step>
+</Steps>
+
+<Warning>
+  For Level 4, shapefile import is the preferred method for geospatial data. See [Importing Shapefiles](/guides/importing-shapefiles).
+</Warning>
+
+## Active vs Inactive Units
+
+All hierarchy levels have an `isActive` boolean flag:
+
+- **Purpose**: Soft-delete or archive units without losing historical data
+- **Behavior**: Inactive units:
+  - Remain in the database
+  - Can be filtered out of queries
+  - May be excluded from reports
+  - Can be reactivated later
+
+**Toggling status**: Use the edit form to change `isActive` to `true` or `false`.
+
+## Permissions Required
+
+To manage forest patrimony hierarchy:
+
+| Action | Required Permission |
+|--------|--------------------|
+| View hierarchy | `forest-patrimony:READ` |
+| Create units | `forest-patrimony:CREATE` |
+| Edit units | `forest-patrimony:UPDATE` |
+| Delete units | `forest-patrimony:DELETE` |
+| Import data | `forest-patrimony:CREATE` or `UPDATE` |
+| Export data | `forest-patrimony:EXPORT` |
+| Import shapefiles | `forest-patrimony:CREATE` or `UPDATE` |
+
+<Note>
+  `forest-patrimony:ADMIN` grants all permissions for hierarchy management.
+</Note>
+
+## Best Practices
+
+<Accordion title="Establish a Coding Convention">
+  Use consistent code patterns across your organization:
+  
+  ```plaintext
+  Level 2: FINCA-01, FINCA-02, PREDIO-A, PREDIO-B
+  Level 3: LOTE-01, LOTE-02, COMP-A, COMP-B
+  Level 4: RODAL-001, RODAL-002, PARC-001
+  Level 5: SUBP-001, SUBP-002, MUE-001
+  ```
+  
+  Benefits:
+  - Easier sorting and searching
+  - Reduced data entry errors
+  - Simplified integration with external systems
+</Accordion>
+
+<Accordion title="Document Hierarchy Structure">
+  Maintain documentation of:
+  - What each code prefix means
+  - Naming conventions for each level
+  - Which types to use for which scenarios
+  - Geographic relationships between units
+</Accordion>
+
+<Accordion title="Regular Area Reconciliation">
+  Periodically verify that:
+  - Sum of Level 3 areas ≈ Parent Level 2 area
+  - Sum of Level 4 areas ≈ Parent Level 3 area
+  - Geometry-calculated areas match manually entered values
+  
+  Discrepancies indicate data entry errors or boundary overlaps.
+</Accordion>
+
+<Accordion title="Use Shapefile Import for Level 4">
+  For Level 4 units:
+  - Always use shapefile import when geospatial data is available
+  - Avoid manual area entry (let CONFOR calculate from geometries)
+  - Keep source shapefiles archived for audit purposes
+</Accordion>
+
+<Accordion title="Soft Delete Instead of Hard Delete">
+  Instead of permanently deleting units:
+  1. Set `isActive = false`
+  2. Add a note in `observacion` explaining why
+  3. Preserve historical data for reporting and compliance
+</Accordion>
+
+## API Endpoints
+
+For programmatic hierarchy management:
+
+```
+GET    /api/forest/patrimony?level={2-5}&parentId={uuid}  # List units
+POST   /api/forest/patrimony                              # Create unit
+PATCH  /api/forest/patrimony                              # Update unit
+DELETE /api/forest/patrimony                              # Delete unit
+POST   /api/forest/patrimony/import                       # Bulk import
+GET    /api/forest/patrimony/export                       # Export
+GET    /api/forest/patrimony/neighbors?level2Id={uuid}    # List neighbors
+POST   /api/forest/patrimony/neighbors                    # Create neighbor
+PATCH  /api/forest/patrimony/neighbors                    # Update neighbor
+DELETE /api/forest/patrimony/neighbors                    # Delete neighbor
+```
+
+### Example: List Level 4 Units
+
+```bash
+curl "https://your-confor-instance.com/api/forest/patrimony?level=4&parentId=level3-uuid&page=1&limit=25"
+```
+
+### Example: Create Level 2 Unit
+
+```bash
+curl -X POST "https://your-confor-instance.com/api/forest/patrimony" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "level": "2",
+    "data": {
+      "code": "FINCA-01",
+      "name": "Finca El Bosque",
+      "type": "FINCA",
+      "legalStatus": "ADQUISICION",
+      "totalAreaHa": 500.5
+    }
+  }'
+```
+
+## Related Guides
+
+- [Importing Shapefiles](/guides/importing-shapefiles) - Bulk geospatial data import for Level 4
+- [Managing Users](/guides/managing-users) - Permission requirements
+- [Audit Logs](/guides/audit-logs) - Track hierarchy changes
+- [Configuring Roles](/guides/configuring-roles) - Set up `forest-patrimony` permissions

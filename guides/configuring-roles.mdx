@@ -1,0 +1,511 @@
+---
+title: Configuring Roles
+description: Create and manage roles with granular permissions in CONFOR
+---
+
+# Configuring Roles
+
+Roles in CONFOR define what users can see and do within the system. This guide explains how to create roles, assign permissions, and manage role-based access control (RBAC).
+
+## Overview
+
+CONFOR's permission system is built on:
+
+- **Roles**: Named collections of permissions (e.g., "Field Manager", "Accountant")
+- **Permissions**: Granular access rights organized by module and action
+- **Modules**: System components like Users, Forest Patrimony, Audit, etc.
+- **Actions**: Operations like CREATE, READ, UPDATE, DELETE, EXPORT, ADMIN
+
+### Permission Model
+
+Each permission is defined as `{module}:{action}`, for example:
+- `users:READ` - Can view user list
+- `users:CREATE` - Can create new users
+- `forest-patrimony:UPDATE` - Can edit forestry data
+- `users:ADMIN` - Full administrative access to user management
+
+## Viewing Roles
+
+Access the Roles page to see all roles in your organization:
+
+<Steps>
+  <Step title="Navigate to Roles">
+    From the dashboard, go to **Roles y permisos** in the main navigation.
+    
+    <Note>
+      You need `users:READ` or `users:ADMIN` permission to view roles.
+    </Note>
+  </Step>
+  
+  <Step title="Select Organization">
+    If you manage multiple organizations, select the active organization from the dropdown.
+    
+    The roles table displays:
+    - **Rol**: Role display name
+    - **Slug**: Internal identifier (uppercase, underscores)
+    - **Organización**: Organization name (or "Global" for system roles)
+    - **Sistema**: Whether this is a protected system role
+    - **Permisos**: Number of permissions assigned
+  </Step>
+</Steps>
+
+### System Roles vs Custom Roles
+
+- **System Roles**: Pre-defined roles like `SUPER_ADMIN`, `ADMIN`, `USER`
+  - Cannot be deleted
+  - Have the "Sistema: Sí" flag
+  - Provide baseline access patterns
+
+- **Custom Roles**: Organization-specific roles you create
+  - Can be edited and deleted
+  - "Sistema: No" flag
+  - Tailored to your workflow
+
+## Creating a New Role
+
+<Steps>
+  <Step title="Open Role Creation Form">
+    On the Roles page, click **Nuevo rol** in the "CRUD de roles" section.
+    
+    <Note>
+      You need `users:CREATE` or `users:ADMIN` permission to create roles.
+    </Note>
+  </Step>
+  
+  <Step title="Enter Role Details">
+    Fill in the role metadata:
+    
+    - **Nombre**: Display name (e.g., "Field Manager", "Data Analyst")
+    - **Slug**: Internal identifier (e.g., "FIELD_MANAGER")
+      - Will be auto-normalized to UPPERCASE with underscores
+      - Must be unique within your organization
+    - **Descripción**: Optional description of the role's purpose
+    
+    ```plaintext
+    Example:
+    Nombre:      Field Manager
+    Slug:        FIELD_MANAGER
+    Descripción: Manages field data collection and forest inventory
+    ```
+  </Step>
+  
+  <Step title="Click Create">
+    Click **Crear rol** to save the new role.
+    
+    The role appears in the roles table with 0 permissions. You'll assign permissions in the next step.
+  </Step>
+</Steps>
+
+## Assigning Permissions to a Role
+
+<Steps>
+  <Step title="Open Permissions Modal">
+    In the roles table, find your role and click the **Permisos** button.
+    
+    A modal opens showing all available modules and their permissions.
+  </Step>
+  
+  <Step title="Review Available Modules">
+    Common modules include:
+    
+    - **users**: User and role management
+    - **forest-patrimony**: Forest hierarchy (Levels 2-5)
+    - **audit**: Audit log viewing
+    - **organizations**: Organization management
+    - **system-config**: System configuration
+    
+    Each module displays its available actions:
+    - CREATE
+    - READ
+    - UPDATE
+    - DELETE
+    - EXPORT (if applicable)
+    - ADMIN (full module access)
+  </Step>
+  
+  <Step title="Assign CRUD Permissions">
+    For quick setup, use the **CRUD completo** checkbox for each module:
+    
+    <Info>
+      "CRUD completo" grants CREATE, READ, UPDATE, and DELETE permissions together.
+    </Info>
+    
+    This is ideal for roles that need full operational access to a module.
+  </Step>
+  
+  <Step title="Fine-Tune Individual Permissions">
+    For granular control, check/uncheck individual action checkboxes:
+    
+    ```plaintext
+    Example: Read-Only Auditor
+    
+    Module: users
+      ☐ CREATE
+      ☑ READ
+      ☐ UPDATE
+      ☐ DELETE
+      ☐ EXPORT
+      ☐ ADMIN
+    
+    Module: audit
+      ☐ CREATE
+      ☑ READ
+      ☐ UPDATE
+      ☐ DELETE
+      ☐ ADMIN
+    ```
+  </Step>
+  
+  <Step title="Use Bulk Actions">
+    The modal provides convenience buttons:
+    
+    - **Marcar todo**: Select all permissions across all modules
+    - **Desmarcar todo**: Clear all permissions
+    
+    <Warning>
+      Using "Desmarcar todo" will remove ALL permissions, potentially locking users out of the system.
+    </Warning>
+  </Step>
+  
+  <Step title="Save Permissions">
+    Click **Guardar permisos** to apply the changes.
+    
+    The role's permission count updates in the table.
+    
+    <Info>
+      Permission changes take effect immediately for all users assigned to this role.
+    </Info>
+  </Step>
+</Steps>
+
+## Editing a Role
+
+To modify an existing role's metadata (name, slug, description):
+
+<Steps>
+  <Step title="Click Edit Button">
+    In the roles table, click the **Editar** button for the role you want to modify.
+    
+    The role details populate in the "CRUD de roles" form at the top of the page.
+  </Step>
+  
+  <Step title="Modify Role Details">
+    Update the:
+    - **Nombre**: Display name
+    - **Slug**: Internal identifier (must remain unique)
+    - **Descripción**: Purpose description
+    
+    <Warning>
+      Changing the slug may break integrations that reference the role by its old slug.
+    </Warning>
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Actualizar rol** to save the modifications.
+  </Step>
+</Steps>
+
+## Deleting Roles
+
+<Steps>
+  <Step title="Select Role to Delete">
+    Locate the role in the roles table.
+    
+    <Info>
+      System roles (with "Sistema: Sí") cannot be deleted and will have a disabled Delete button.
+    </Info>
+  </Step>
+  
+  <Step title="Click Delete">
+    Click the **Eliminar** button for the role.
+    
+    A confirmation dialog appears.
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    In the confirmation toast, click **Eliminar** again.
+    
+    <Warning>
+      Deleting a role:
+      - Removes it from all assigned users
+      - Cannot be undone
+      - May lock users out if it was their only role
+    </Warning>
+  </Step>
+</Steps>
+
+### Bulk Role Deletion
+
+To delete multiple roles at once:
+
+<Steps>
+  <Step title="Select Roles">
+    Check the checkboxes next to the roles you want to delete.
+    
+    <Info>
+      System roles cannot be selected for bulk deletion.
+    </Info>
+  </Step>
+  
+  <Step title="Click Bulk Delete">
+    At the bottom of the page, click **Eliminar seleccionados (N)**, where N is the count of selected roles.
+  </Step>
+  
+  <Step title="Confirm Bulk Deletion">
+    Confirm in the dialog that appears.
+    
+    CONFOR deletes all selected roles in parallel and reports:
+    - Number successfully deleted
+    - Number that failed (if any)
+  </Step>
+</Steps>
+
+## Importing Roles
+
+For bulk role provisioning:
+
+<Steps>
+  <Step title="Prepare Import File">
+    Create a CSV or Excel file with columns:
+    
+    - `name`: Role display name
+    - `slug`: Role identifier (will be normalized)
+    - `description`: Optional description
+    - `permissions`: Comma-separated permission IDs (optional)
+    
+    ```csv
+    name,slug,description
+    Data Analyst,data_analyst,Analyzes forest inventory data
+    Field Coordinator,field_coordinator,Coordinates field operations
+    ```
+  </Step>
+  
+  <Step title="Click Import">
+    On the Roles page, click **Importar**.
+  </Step>
+  
+  <Step title="Upload File">
+    Select your CSV or Excel file.
+    
+    CONFOR processes the import and displays:
+    - **Creados**: New roles created
+    - **Actualizados**: Existing roles updated
+    - **Omitidos**: Duplicate slugs skipped
+    - **Errores**: Validation errors
+  </Step>
+</Steps>
+
+## Exporting Roles
+
+Export roles for backup or documentation:
+
+<Steps>
+  <Step title="Configure Export">
+    Set:
+    - **Límite de exportación**: Number of roles to export (default: 100)
+    - Use search to filter which roles to export
+  </Step>
+  
+  <Step title="Choose Format">
+    Click:
+    - **Exportar CSV**: For spreadsheet software
+    - **Exportar Excel**: For Microsoft Excel
+  </Step>
+  
+  <Step title="Download File">
+    The file downloads with a name like `roles.csv` or `roles.xlsx`.
+  </Step>
+</Steps>
+
+## Common Role Configurations
+
+### Administrator Role
+
+**Permissions**: All modules with ADMIN action
+
+```plaintext
+Role: Administrator
+Slug: ADMIN
+
+Permissions:
+  users:ADMIN
+  forest-patrimony:ADMIN
+  audit:ADMIN
+  organizations:ADMIN
+  system-config:ADMIN
+```
+
+### Read-Only Viewer
+
+**Permissions**: READ only across modules
+
+```plaintext
+Role: Viewer
+Slug: VIEWER
+
+Permissions:
+  users:READ
+  forest-patrimony:READ
+  audit:READ
+```
+
+### Field Data Manager
+
+**Permissions**: Full CRUD on forest data, read-only elsewhere
+
+```plaintext
+Role: Field Manager
+Slug: FIELD_MANAGER
+
+Permissions:
+  forest-patrimony:CREATE
+  forest-patrimony:READ
+  forest-patrimony:UPDATE
+  forest-patrimony:DELETE
+  forest-patrimony:EXPORT
+  users:READ
+  audit:READ
+```
+
+### Auditor
+
+**Permissions**: Full audit access, read-only elsewhere
+
+```plaintext
+Role: Auditor
+Slug: AUDITOR
+
+Permissions:
+  audit:READ
+  audit:EXPORT
+  users:READ
+  forest-patrimony:READ
+```
+
+## Permissions Required
+
+To perform role configuration actions:
+
+| Action | Required Permission |
+|--------|--------------------|
+| View roles list | `users:READ` or `users:ADMIN` |
+| Create roles | `users:CREATE` or `users:ADMIN` |
+| Edit role metadata | `users:UPDATE` or `users:ADMIN` |
+| Assign permissions | `users:UPDATE` or `users:ADMIN` |
+| Delete roles | `users:DELETE` or `users:ADMIN` |
+| Import roles | `users:CREATE` or `users:ADMIN` |
+| Export roles | `users:EXPORT` or `users:ADMIN` |
+
+## Best Practices
+
+<Accordion title="Follow Principle of Least Privilege">
+  Grant users only the permissions they need:
+  - Start with minimal permissions
+  - Add permissions as needed
+  - Regularly review and audit role assignments
+  - Avoid over-using ADMIN permissions
+</Accordion>
+
+<Accordion title="Use Descriptive Role Names">
+  Make role purpose clear from the name:
+  - ✅ "Field Manager", "Data Analyst", "Reporting Specialist"
+  - ❌ "Role1", "Test", "New Role"
+  
+  Include department or function in the name for large organizations.
+</Accordion>
+
+<Accordion title="Document Role Definitions">
+  Maintain documentation about:
+  - What each role is intended for
+  - Which departments use which roles
+  - Permission rationale for each role
+  - When to use each role vs others
+</Accordion>
+
+<Accordion title="Test Roles Before Deployment">
+  Before assigning a new role to production users:
+  1. Create a test user account
+  2. Assign the new role
+  3. Verify all intended workflows function correctly
+  4. Check that restricted areas are properly blocked
+</Accordion>
+
+<Accordion title="Avoid Modifying System Roles">
+  System roles (SUPER_ADMIN, ADMIN, USER) provide baseline functionality:
+  - Don't modify their permissions
+  - Create custom roles for specific needs instead
+  - Use system roles as templates for new roles
+</Accordion>
+
+## Troubleshooting
+
+### User Can't Access a Feature
+
+**Check role permissions**: Verify the user's role has the required permission.
+
+**Multiple roles**: If a user has multiple roles, permissions are cumulative. Check all assigned roles.
+
+**Recent changes**: Permission changes take effect immediately, but the user may need to refresh their browser.
+
+### Role Creation Fails
+
+**Duplicate slug**: The slug must be unique within your organization. Try a different identifier.
+
+**Invalid characters**: Slugs are normalized to UPPERCASE with underscores. Avoid special characters.
+
+**Missing permissions**: You need `users:CREATE` or `users:ADMIN` to create roles.
+
+### Can't Delete a Role
+
+**System role**: System roles (with "Sistema: Sí") cannot be deleted.
+
+**In use**: Consider removing the role from all users before deletion, though this is not strictly required.
+
+**Permissions**: You need `users:DELETE` or `users:ADMIN` to delete roles.
+
+## API Endpoints
+
+For programmatic role management:
+
+```
+GET    /api/roles              # List roles with permissions
+POST   /api/roles              # Create a new role
+PATCH  /api/roles              # Update role permissions
+PATCH  /api/roles/{id}         # Update role metadata
+DELETE /api/roles/{id}         # Delete a role
+POST   /api/roles/import       # Bulk import roles
+GET    /api/roles/export       # Export roles
+```
+
+### Example: Create a Role
+
+```bash
+curl -X POST "https://your-confor-instance.com/api/roles" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Field Manager",
+    "slug": "FIELD_MANAGER",
+    "description": "Manages field operations and data collection"
+  }'
+```
+
+### Example: Assign Permissions
+
+```bash
+curl -X PATCH "https://your-confor-instance.com/api/roles" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "roleId": "role-uuid-here",
+    "permissionIds": [
+      "permission-uuid-1",
+      "permission-uuid-2",
+      "permission-uuid-3"
+    ]
+  }'
+```
+
+## Related Guides
+
+- [Managing Users](/guides/managing-users) - Assign roles to users
+- [Audit Logs](/guides/audit-logs) - Track role and permission changes
+- [Forest Hierarchy](/guides/forest-hierarchy) - Understand data access patterns

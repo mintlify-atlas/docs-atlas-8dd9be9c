@@ -1,0 +1,323 @@
+---
+title: "Geospatial Import"
+description: "Import Level 4 geometries from shapefiles with hierarchical validation"
+---
+
+## Import Shapefile (Level 4)
+
+<Note>
+  Shapefile import requires a ZIP archive containing `.shp`, `.shx`, `.dbf`, and `.prj` files.
+</Note>
+
+### POST `/api/forest/geo/import`
+
+Upload a zipped shapefile to import Level 4 geometries. The import process runs asynchronously in a background worker.
+
+**Authentication:** Required  
+**Permissions:** `forest-patrimony:CREATE` or `forest-patrimony:UPDATE`
+
+#### Request
+
+<ParamField body="file" type="file" required>
+  ZIP archive containing shapefile components (.shp, .shx, .dbf, .prj)
+</ParamField>
+
+<ParamField body="variationDate" type="string">
+  Date of land use change (ISO 8601 format: `YYYY-MM-DD`). Defaults to current date if not provided.
+</ParamField>
+
+<ParamField body="variationNotes" type="string">
+  Optional notes about the land use variation for auditing purposes
+</ParamField>
+
+#### Shapefile Attribute Requirements
+
+<ParamField body="nivel2_id" type="string" required>
+  Level 2 identifier for hierarchical linking
+</ParamField>
+
+<ParamField body="nivel3_id" type="string" required>
+  Level 3 identifier for hierarchical linking
+</ParamField>
+
+<ParamField body="nivel4_id" type="string" required>
+  Level 4 identifier (rodal/stand code)
+</ParamField>
+
+<ParamField body="usoactual" type="string">
+  Current land use name (must exist in `LandUseType` table)
+</ParamField>
+
+<ParamField body="usoanterior" type="string">
+  Previous land use name
+</ParamField>
+
+<ParamField body="fechavariacion" type="string">
+  Feature-level variation date (overrides request-level `variationDate`)
+</ParamField>
+
+<ParamField body="observaciones" type="string">
+  Feature-level observations
+</ParamField>
+
+#### Spatial Requirements
+
+- **Geometry Type:** Polygon or MultiPolygon
+- **CRS:** Must be transformable to EPSG:4326 (WGS 84)
+- **Validity:** All geometries must be spatially valid
+
+#### Response
+
+<ResponseField name="jobId" type="string">
+  Unique identifier for the import job
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Initial job status: `PENDING`
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Confirmation message
+</ResponseField>
+
+#### Example: Upload Shapefile
+
+```bash cURL
+curl -X POST https://api.confor.com/api/forest/geo/import \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@nivel4_geometries.zip" \
+  -F "variationDate=2026-03-09" \
+  -F "variationNotes=Actualización cartográfica trimestral"
+```
+
+```json Response
+{
+  "jobId": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "PENDING",
+  "message": "Archivo recibido. El worker procesará la importación en segundo plano."
+}
+```
+
+---
+
+## Get Import Job Status
+
+### GET `/api/forest/geo/import/[jobId]`
+
+Retrieve the status and details of a specific import job.
+
+**Authentication:** Required  
+**Permissions:** Organization-scoped (user must belong to the same organization as the job)
+
+#### Path Parameters
+
+<ParamField path="jobId" type="string" required>
+  UUID of the import job
+</ParamField>
+
+#### Response
+
+<ResponseField name="id" type="string">
+  Job UUID
+</ResponseField>
+
+<ResponseField name="organizationId" type="string">
+  Organization UUID
+</ResponseField>
+
+<ResponseField name="fileName" type="string">
+  Original uploaded file name
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Job status: `PENDING`, `EXTRACTING`, `VALIDATING`, `PROCESSING`, `COMPLETED`, or `FAILED`
+</ResponseField>
+
+<ResponseField name="totalRecords" type="number">
+  Total number of features in the shapefile
+</ResponseField>
+
+<ResponseField name="processedRecords" type="number">
+  Number of successfully processed features
+</ResponseField>
+
+<ResponseField name="failedRecords" type="number">
+  Number of features that failed validation or processing
+</ResponseField>
+
+<ResponseField name="errorMessage" type="string">
+  Error details if the job failed
+</ResponseField>
+
+<ResponseField name="items" type="array">
+  Array of import items (up to 100 most recent). Each item contains:
+  - `featureIndex`: Index of the feature in the shapefile
+  - `status`: `PROCESSED` or `FAILED`
+  - `level2Code`, `level3Code`, `level4Code`: Extracted hierarchy codes
+  - `message`: Error or success message
+  - `rawProperties`: Original shapefile attributes
+</ResponseField>
+
+<ResponseField name="createdAt" type="string">
+  Job creation timestamp (ISO 8601)
+</ResponseField>
+
+<ResponseField name="startedAt" type="string">
+  Processing start timestamp
+</ResponseField>
+
+<ResponseField name="completedAt" type="string">
+  Processing completion timestamp
+</ResponseField>
+
+#### Example: Check Job Status
+
+```bash cURL
+curl -X GET https://api.confor.com/api/forest/geo/import/550e8400-e29b-41d4-a716-446655440000 \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```json Response
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "organizationId": "org_123",
+  "fileName": "nivel4_geometries.zip",
+  "status": "COMPLETED",
+  "totalRecords": 150,
+  "processedRecords": 148,
+  "failedRecords": 2,
+  "errorMessage": null,
+  "items": [
+    {
+      "featureIndex": 0,
+      "status": "PROCESSED",
+      "level2Code": "N2-001",
+      "level3Code": "N3-001",
+      "level4Code": "N4-001",
+      "message": null,
+      "rawProperties": {
+        "nivel2_id": "N2-001",
+        "nivel3_id": "N3-001",
+        "nivel4_id": "N4-001",
+        "usoactual": "BOSQUE"
+      }
+    }
+  ],
+  "createdAt": "2026-03-09T10:00:00Z",
+  "startedAt": "2026-03-09T10:00:05Z",
+  "completedAt": "2026-03-09T10:02:30Z"
+}
+```
+
+---
+
+## Download Import Template
+
+### GET `/api/forest/geo/import?format=csv`
+
+Download a sample template for shapefile attribute structure.
+
+**Authentication:** Required  
+**Permissions:** `forest-patrimony:READ`
+
+#### Query Parameters
+
+<ParamField query="format" type="string" default="csv">
+  Template format: `csv` or `xlsx`
+</ParamField>
+
+#### Response
+
+Returns a downloadable file with sample attribute structure:
+- `nivel2`: Level 2 code
+- `nivel3`: Level 3 code
+- `nivel4`: Level 4 code
+- `usoactual`: Current land use
+- `usoanterior`: Previous land use
+- `fechavariacion`: Variation date
+- `observaciones`: Observations
+
+#### Example: Download CSV Template
+
+```bash cURL
+curl -X GET "https://api.confor.com/api/forest/geo/import?format=csv" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -o template.csv
+```
+
+---
+
+## Field Mapping Alternatives
+
+The import worker supports multiple field name variations for flexibility:
+
+| Standard Field | Accepted Alternatives |
+|----------------|----------------------|
+| `nivel2_id` | `nivel2`, `nivel_2`, `cod_n2`, `codfinca`, `finca`, `n2` |
+| `nivel3_id` | `nivel3`, `nivel_3`, `cod_n3`, `codlote`, `lote`, `n3` |
+| `nivel4_id` | `nivel4`, `nivel_4`, `cod_n4`, `codrodal`, `rodal`, `n4` |
+| `usoactual` | `currentlandusename`, `uso_actual`, `uso`, `landuse`, `land_use` |
+| `usoanterior` | `previouslandusename`, `uso_anterior`, `previoususe`, `oldlanduse` |
+| `fechavariacion` | `variationdate`, `fecha_variacion`, `landusechangedate`, `fecha_cambio_uso` |
+| `observaciones` | `variationnotes`, `observacion`, `nota`, `notas`, `comentario`, `comentarios` |
+
+<Warning>
+  Field names are case-insensitive during import.
+</Warning>
+
+---
+
+## Import Process Workflow
+
+1. **Upload**: File is uploaded and validated for required components (.shp, .shx, .dbf, .prj)
+2. **Job Creation**: Import job is created with `PENDING` status
+3. **Worker Trigger**: Background worker is notified (or picks up job on next poll)
+4. **Extraction**: Shapefile is parsed into GeoJSON features
+5. **Validation**: Each feature is validated for:
+   - Required hierarchy codes (nivel2_id, nivel3_id, nivel4_id)
+   - Valid geometry type (Polygon/MultiPolygon)
+   - Existing Level 2/3/4 relationships in database
+   - Land use name validation against `LandUseType` table
+6. **Geometry Storage**: Valid geometries are stored in `forest_geometry_n4` table
+7. **Metrics Calculation**: Surface area and centroid are calculated using PostGIS
+8. **Land Use Sync**: Organization-level land use totals are recalculated
+9. **Variation Tracking**: Land use changes trigger patrimonial variation records
+10. **Completion**: Job status is updated to `COMPLETED` or `FAILED`
+
+<Info>
+  The worker processes imports in batches (default: 5 jobs per cycle) with configurable intervals (`GEO_WORKER_INTERVAL_MS`).
+</Info>
+
+---
+
+## Error Handling
+
+### Common Import Errors
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| `ZIP incompleto. Faltan archivos obligatorios` | Missing required shapefile components | Ensure ZIP contains .shp, .shx, .dbf, and .prj files |
+| `No se encontraron códigos de jerarquía` | Missing nivel2_id, nivel3_id, or nivel4_id attributes | Add required hierarchy codes to shapefile attributes |
+| `No existe relación jerárquica válida` | Hierarchy codes don't match database records | Verify Level 2/3/4 codes exist and are linked correctly |
+| `Solo se permiten geometrías Polygon o MultiPolygon` | Invalid geometry type (Point, LineString, etc.) | Convert geometries to Polygon or MultiPolygon |
+| `El uso actual no existe en la tabla auxiliar` | Invalid land use name | Add land use type to configuration or correct attribute value |
+
+<Tip>
+  Check the `items` array in the job status response for feature-level error details.
+</Tip>
+
+---
+
+## Security & Multi-Organization Isolation
+
+- **Organization Scoping**: `organizationId` is derived from the authenticated user, not from shapefile attributes
+- **Hierarchy Validation**: All Level 2/3/4 relationships are validated against the user's organization
+- **Cross-Organization Prevention**: Imports cannot create or modify geometries in other organizations
+- **Audit Trail**: All imports are tracked with `createdById` and job metadata
+
+---
+
+## Related Endpoints
+
+- [Validate Geometries](/api/geo/validate) - Pre-validate shapefiles before import
+- [Forest Configuration](/api/config/forest-config) - Manage land use types and other configurations

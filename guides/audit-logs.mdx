@@ -1,0 +1,544 @@
+---
+title: Audit Logs
+description: Track system activity and maintain compliance with CONFOR's audit logging
+---
+
+# Audit Logs
+
+CONFOR maintains comprehensive audit logs of all significant system activities, enabling compliance tracking, security monitoring, and change history analysis.
+
+## Overview
+
+Audit logs in CONFOR capture:
+
+- **User actions**: Login, logout, CRUD operations
+- **Data changes**: Before/after values for updates
+- **System events**: Permission changes, exports, deletions
+- **Security events**: Failed login attempts, password resets
+
+**Database table**: `AuditLog` (using monthly partitioning for performance)
+
+## Audit Log Structure
+
+Each audit log entry contains:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | UUID | Unique log entry identifier |
+| `organizationId` | UUID | Organization scope (null for system-wide) |
+| `userId` | UUID | User who performed the action |
+| `sessionId` | UUID | Session identifier for tracking |
+| `action` | enum | Type of action (see below) |
+| `entityType` | string | Affected entity (e.g., "User", "Role", "ForestPatrimonyLevel2") |
+| `entityId` | UUID | ID of affected entity |
+| `entityName` | string | Display name of affected entity |
+| `oldValues` | JSON | Previous state (for updates) |
+| `newValues` | JSON | New state (for creates/updates) |
+| `changedFields` | string[] | List of fields that changed |
+| `ipAddress` | string | IP address of request |
+| `userAgent` | string | Browser/client user agent |
+| `requestId` | UUID | Unique request identifier |
+| `durationMs` | integer | Operation duration in milliseconds |
+| `statusCode` | integer | HTTP status code |
+| `errorMessage` | string | Error details (if action failed) |
+| `metadata` | JSON | Additional context-specific data |
+| `createdAt` | timestamp | When the action occurred |
+
+## Audit Actions
+
+From the `AuditAction` enum:
+
+| Action | Description | Example |
+|--------|-------------|----------|
+| `CREATE` | New entity created | User invited, role created |
+| `UPDATE` | Entity modified | User role changed, area updated |
+| `DELETE` | Entity removed | User deleted, role removed |
+| `LOGIN` | Successful login | User authenticated |
+| `LOGOUT` | User logged out | Session ended |
+| `LOGIN_FAILED` | Failed login attempt | Wrong password, locked account |
+| `PASSWORD_RESET` | Password changed/reset | User or admin password reset |
+| `PERMISSION_CHANGE` | Permissions modified | Role permissions updated |
+| `EXPORT` | Data exported | CSV/Excel export triggered |
+| `VIEW` | Sensitive data viewed | Report accessed, user details viewed |
+
+## Viewing Audit Logs
+
+<Steps>
+  <Step title="Navigate to Audit Page">
+    From the dashboard, go to **Auditoría** in the main navigation.
+    
+    <Note>
+      You need `audit:READ` permission to view audit logs.
+    </Note>
+  </Step>
+  
+  <Step title="Review Log Entries">
+    The audit log table displays:
+    
+    - **Acción**: Type of action performed
+    - **Entidad**: Entity type affected
+    - **Fecha**: Timestamp of the action
+    - **Acciones**: Options to delete individual entries
+    
+    Entries are sorted by `createdAt` in descending order (most recent first).
+  </Step>
+  
+  <Step title="Inspect Log Details">
+    Click on a log entry row to view full details:
+    
+    - User who performed the action
+    - Session information
+    - Before/after values (for updates)
+    - Changed fields list
+    - IP address and user agent
+    - Request metadata
+  </Step>
+</Steps>
+
+## Common Audit Scenarios
+
+### User Management Actions
+
+When managing users, the following actions are logged:
+
+**User Creation**:
+```json
+{
+  "action": "CREATE",
+  "entityType": "User",
+  "entityId": "user-uuid",
+  "newValues": {
+    "email": "newuser@example.com",
+    "role": "USER",
+    "organizationId": "org-uuid"
+  }
+}
+```
+
+**User Update**:
+```json
+{
+  "action": "UPDATE",
+  "entityType": "User",
+  "entityId": "user-uuid",
+  "oldValues": {
+    "status": "PENDING_VERIFICATION",
+    "roleSlug": "USER"
+  },
+  "newValues": {
+    "status": "ACTIVE",
+    "roleSlug": "ADMIN"
+  },
+  "changedFields": ["status", "roleSlug"]
+}
+```
+
+**User Deletion**:
+```json
+{
+  "action": "DELETE",
+  "entityType": "User",
+  "entityId": "user-uuid",
+  "oldValues": {
+    "email": "user@example.com",
+    "status": "ACTIVE"
+  }
+}
+```
+
+### Role and Permission Changes
+
+**Role Creation**:
+```json
+{
+  "action": "CREATE",
+  "entityType": "Role",
+  "entityId": "role-uuid",
+  "newValues": {
+    "name": "Field Manager",
+    "slug": "FIELD_MANAGER"
+  }
+}
+```
+
+**Permission Update**:
+```json
+{
+  "action": "PERMISSION_CHANGE",
+  "entityType": "Role",
+  "entityId": "role-uuid",
+  "entityName": "Field Manager",
+  "newValues": {
+    "permissionIds": ["perm-1", "perm-2", "perm-3"]
+  },
+  "metadata": {
+    "addedPermissions": ["forest-patrimony:UPDATE"],
+    "removedPermissions": ["users:DELETE"]
+  }
+}
+```
+
+### Forest Patrimony Changes
+
+**Level 2 Unit Created**:
+```json
+{
+  "action": "CREATE",
+  "entityType": "ForestPatrimonyLevel2",
+  "entityId": "level2-uuid",
+  "newValues": {
+    "code": "FINCA-01",
+    "name": "Finca El Bosque",
+    "totalAreaHa": 500.5
+  }
+}
+```
+
+**Area Updated**:
+```json
+{
+  "action": "UPDATE",
+  "entityType": "ForestPatrimonyLevel4",
+  "entityId": "level4-uuid",
+  "oldValues": {
+    "totalAreaHa": 45.3
+  },
+  "newValues": {
+    "totalAreaHa": 47.8
+  },
+  "changedFields": ["totalAreaHa"]
+}
+```
+
+### Login and Security Events
+
+**Successful Login**:
+```json
+{
+  "action": "LOGIN",
+  "userId": "user-uuid",
+  "sessionId": "session-uuid",
+  "ipAddress": "192.168.1.100",
+  "userAgent": "Mozilla/5.0...",
+  "metadata": {
+    "method": "credentials"
+  }
+}
+```
+
+**Failed Login**:
+```json
+{
+  "action": "LOGIN_FAILED",
+  "entityType": "User",
+  "ipAddress": "192.168.1.100",
+  "errorMessage": "Invalid credentials",
+  "metadata": {
+    "attemptedEmail": "user@example.com",
+    "failureReason": "wrong_password"
+  }
+}
+```
+
+### Data Export Actions
+
+**User Export**:
+```json
+{
+  "action": "EXPORT",
+  "entityType": "User",
+  "metadata": {
+    "format": "csv",
+    "recordCount": 150,
+    "filters": {
+      "status": "ACTIVE",
+      "organizationId": "org-uuid"
+    }
+  }
+}
+```
+
+## Deleting Audit Logs
+
+<Warning>
+  Deleting audit logs may affect compliance requirements. Consult your organization's data retention policies before deleting.
+</Warning>
+
+### Delete Individual Entry
+
+<Steps>
+  <Step title="Locate Log Entry">
+    Find the entry you want to delete in the audit log table.
+  </Step>
+  
+  <Step title="Click Delete Icon">
+    Click the trash can icon (🗑️) in the Actions column.
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    Confirm the deletion in the browser alert dialog.
+    
+    The entry is permanently removed from the database.
+  </Step>
+</Steps>
+
+### Delete All Logs
+
+<Steps>
+  <Step title="Click Delete All">
+    At the top-right of the Audit page, click **Eliminar todo**.
+  </Step>
+  
+  <Step title="Confirm Bulk Deletion">
+    Confirm in the alert dialog.
+    
+    <Warning>
+      This action deletes **ALL** audit logs in the database and cannot be undone.
+    </Warning>
+  </Step>
+</Steps>
+
+<Info>
+  Most compliance frameworks require audit logs to be immutable and retained for a minimum period (e.g., 1 year). Consider disabling the delete functionality in production environments.
+</Info>
+
+## Monthly Partitioning
+
+CONFOR uses PostgreSQL table partitioning for audit logs:
+
+**Purpose**: Improve query performance and enable efficient archival.
+
+**Structure**:
+- Parent table: `audit_logs`
+- Child tables: `audit_logs_YYYYMM` (e.g., `audit_logs_202603`)
+
+**Automatic partitioning**: New partitions are created automatically by the database trigger when inserting logs for a new month.
+
+**Manual partition creation**:
+```bash
+# From the README
+ts-node scripts/create-audit-partition.ts
+```
+
+This script creates the next month's partition in advance.
+
+## Audit Log Queries
+
+### API Endpoints
+
+```
+GET    /api/audit              # List audit logs (paginated)
+GET    /api/audit/{id}         # Get single log entry
+DELETE /api/audit/{id}         # Delete single entry
+DELETE /api/audit              # Delete all entries
+```
+
+### Example: Fetch Recent Logs
+
+```bash
+curl "https://your-confor-instance.com/api/audit?page=1&limit=50"
+```
+
+Response:
+```json
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "log-uuid",
+        "action": "CREATE",
+        "entityType": "User",
+        "createdAt": "2026-03-09T10:30:00Z",
+        ...
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "totalPages": 10,
+      "total": 500,
+      "limit": 50
+    }
+  }
+}
+```
+
+### Example: Query by User
+
+```sql
+SELECT 
+  action,
+  entity_type,
+  entity_name,
+  created_at
+FROM audit_logs
+WHERE user_id = 'user-uuid'
+ORDER BY created_at DESC
+LIMIT 100;
+```
+
+### Example: Query by Date Range
+
+```sql
+SELECT 
+  user_id,
+  action,
+  entity_type,
+  created_at
+FROM audit_logs
+WHERE created_at BETWEEN '2026-03-01' AND '2026-03-31'
+  AND action IN ('CREATE', 'UPDATE', 'DELETE')
+ORDER BY created_at DESC;
+```
+
+### Example: Failed Login Analysis
+
+```sql
+SELECT 
+  ip_address,
+  metadata->>'attemptedEmail' AS email,
+  COUNT(*) AS attempt_count,
+  MAX(created_at) AS last_attempt
+FROM audit_logs
+WHERE action = 'LOGIN_FAILED'
+  AND created_at > NOW() - INTERVAL '1 day'
+GROUP BY ip_address, metadata->>'attemptedEmail'
+HAVING COUNT(*) > 5
+ORDER BY attempt_count DESC;
+```
+
+## Compliance and Security
+
+### Data Retention
+
+**Recommendation**: Retain audit logs for at least 12 months to comply with common frameworks:
+
+- **ISO 27001**: Audit logs must be retained for analysis
+- **SOC 2**: Log retention for security monitoring
+- **FSC Chain of Custody**: Track forest product transactions (relevant for CONFOR)
+
+**Implementation**:
+1. Archive old partitions to cold storage (e.g., S3)
+2. Compress archived partitions
+3. Drop partitions older than retention period
+
+### Access Control
+
+**Permissions**:
+- `audit:READ` - View audit logs
+- `audit:DELETE` - Delete audit logs (should be restricted)
+- `audit:ADMIN` - Full audit log management
+
+**Best practices**:
+- Grant `audit:READ` to compliance/security teams
+- Restrict `audit:DELETE` to system administrators only
+- Log access to audit logs themselves (meta-auditing)
+
+### Immutability
+
+For high-security environments:
+
+1. **Disable delete functionality**: Remove delete buttons from UI
+2. **Database-level protection**: Revoke DELETE permissions on `audit_logs` table
+3. **Write-once storage**: Export logs to immutable storage (WORM drives, append-only S3)
+
+## Troubleshooting
+
+### Logs Not Appearing
+
+**Check partition creation**: Ensure partitions exist for the current month.
+
+```sql
+SELECT tablename 
+FROM pg_tables 
+WHERE schemaname = 'public' 
+  AND tablename LIKE 'audit_logs_%'
+ORDER BY tablename DESC;
+```
+
+**Create missing partition**:
+```bash
+ts-node scripts/create-audit-partition.ts
+```
+
+### Performance Issues
+
+**Symptom**: Slow audit log queries.
+
+**Solutions**:
+1. Ensure indexes exist:
+   ```sql
+   CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+   CREATE INDEX idx_audit_logs_entity_type ON audit_logs(entity_type);
+   CREATE INDEX idx_audit_logs_action ON audit_logs(action);
+   CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+   ```
+
+2. Partition old data to archive tables
+3. Increase PostgreSQL `work_mem` for large queries
+
+### Disk Space Growth
+
+**Symptom**: Audit logs consuming excessive disk space.
+
+**Solutions**:
+1. **Archive old partitions**:
+   ```bash
+   pg_dump --table=audit_logs_202601 confor > audit_202601.sql.gz
+   DROP TABLE audit_logs_202601;
+   ```
+
+2. **Compress JSON fields**: Use PostgreSQL `jsonb` compression
+3. **Trim `metadata` fields**: Remove verbose/unnecessary data from logs
+
+## Best Practices
+
+<Accordion title="Don't Log Sensitive Data">
+  Avoid logging:
+  - Passwords (even hashed)
+  - API keys or tokens
+  - Credit card numbers
+  - Personal identification numbers
+  
+  Use placeholder values like `[REDACTED]` in audit logs.
+</Accordion>
+
+<Accordion title="Include Contextual Metadata">
+  Always log:
+  - User ID and session ID
+  - IP address and user agent
+  - Request ID for correlation
+  - Organization ID for multi-tenancy
+  
+  This enables thorough security investigations.
+</Accordion>
+
+<Accordion title="Regular Audit Reviews">
+  Schedule periodic reviews:
+  - Weekly: Failed login attempts
+  - Monthly: Permission changes
+  - Quarterly: Data export patterns
+  - Annually: Full compliance audit
+</Accordion>
+
+<Accordion title="Alert on Suspicious Activity">
+  Set up automated alerts for:
+  - Multiple failed logins from same IP
+  - Mass data exports
+  - Admin permission grants
+  - After-hours access to sensitive data
+</Accordion>
+
+<Accordion title="Maintain Audit Trail Integrity">
+  - Never modify audit logs after creation
+  - Use database constraints to prevent updates
+  - Regularly backup audit log partitions
+  - Hash log entries for tamper detection (advanced)
+</Accordion>
+
+## Related Guides
+
+- [Managing Users](/guides/managing-users) - Actions that generate audit logs
+- [Configuring Roles](/guides/configuring-roles) - Permission changes are audited
+- [Forest Hierarchy](/guides/forest-hierarchy) - Patrimony changes are logged
+- [Importing Shapefiles](/guides/importing-shapefiles) - Import jobs are audited

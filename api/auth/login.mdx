@@ -1,0 +1,180 @@
+---
+title: 'Login'
+api: 'POST /api/auth/callback/credentials'
+description: 'Authenticate a user and create a session'
+---
+
+## Authentication
+
+This endpoint uses NextAuth.js credentials provider for authentication.
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  User's email address. Must be a valid email format.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User's password. Minimum 1 character.
+</ParamField>
+
+<ParamField body="organizationId" type="string" required>
+  UUID of the organization the user belongs to.
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Indicates if the authentication was successful.
+</ResponseField>
+
+<ResponseField name="user" type="object">
+  Authenticated user information.
+  
+  <ResponseField name="id" type="string">
+    User's unique identifier (UUID).
+  </ResponseField>
+  
+  <ResponseField name="email" type="string">
+    User's email address.
+  </ResponseField>
+  
+  <ResponseField name="name" type="string">
+    User's display name or full name.
+  </ResponseField>
+  
+  <ResponseField name="roles" type="array">
+    Array of role names assigned to the user.
+  </ResponseField>
+  
+  <ResponseField name="permissions" type="array">
+    Array of permission strings for the user.
+  </ResponseField>
+  
+  <ResponseField name="organizationId" type="string | null">
+    UUID of the user's organization.
+  </ResponseField>
+  
+  <ResponseField name="organizationName" type="string | null">
+    Name of the user's organization.
+  </ResponseField>
+</ResponseField>
+
+## Pre-Login Validation
+
+Before attempting login, use the `/api/auth/login-validation` endpoint to validate user status:
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://your-domain.com/api/auth/login-validation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "organizationId": "123e4567-e89b-12d3-a456-426614174000"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/auth/login-validation', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    email: 'user@example.com',
+    organizationId: '123e4567-e89b-12d3-a456-426614174000'
+  })
+});
+
+const result = await response.json();
+```
+
+</CodeGroup>
+
+## Error Responses
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong.
+</ResponseField>
+
+<ResponseField name="details" type="object">
+  Additional error details, if available.
+</ResponseField>
+
+### Common Error Cases
+
+| Status Code | Error Code | Description |
+|------------|------------|-------------|
+| 401 | - | Invalid credentials or authentication failed |
+| 409 | `USER_NOT_IN_ORG` | User does not belong to the specified organization |
+| 409 | `ORG_NOT_AVAILABLE` | Organization is inactive or deleted |
+| 409 | `USER_NOT_ACTIVE` | User account status is not ACTIVE (e.g., PENDING_VERIFICATION) |
+| 429 | - | Account locked due to failed login attempts (5+ failures locks for 30 minutes) |
+
+## Login Flow
+
+1. User must have an ACTIVE status
+2. User must belong to the specified organization
+3. Organization must be active and not deleted
+4. Account must not be locked (due to failed attempts)
+5. Password must match the stored hash
+6. On success, failed login attempts are reset and `lastLoginAt` is updated
+7. On failure, failed login attempts are incremented (5+ attempts locks account for 30 minutes)
+8. All login attempts (success and failure) are logged in the audit log
+
+## Code Example
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://your-domain.com/api/auth/callback/credentials \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "password": "SecurePass123",
+    "organizationId": "123e4567-e89b-12d3-a456-426614174000"
+  }'
+```
+
+```javascript JavaScript
+import { signIn } from 'next-auth/react';
+
+const result = await signIn('credentials', {
+  email: 'user@example.com',
+  password: 'SecurePass123',
+  organizationId: '123e4567-e89b-12d3-a456-426614174000',
+  redirect: false,
+});
+
+if (result?.error) {
+  console.error('Login failed:', result.error);
+} else {
+  console.log('Login successful');
+}
+```
+
+```python Python
+import requests
+
+url = "https://your-domain.com/api/auth/callback/credentials"
+payload = {
+    "email": "user@example.com",
+    "password": "SecurePass123",
+    "organizationId": "123e4567-e89b-12d3-a456-426614174000"
+}
+
+response = requests.post(url, json=payload)
+result = response.json()
+```
+
+</CodeGroup>
+
+## Session Management
+
+On successful authentication, a JWT session token is created with the following data:
+- User ID
+- Roles and permissions
+- Organization ID and name
+
+The session uses JWT strategy and is managed by NextAuth.js.

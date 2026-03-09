@@ -1,0 +1,560 @@
+---
+title: Forest Patrimony
+description: Hierarchical forest land management system with 5 organizational levels for comprehensive inventory tracking
+---
+
+## Overview
+
+CONFOR's **Forest Patrimony** module implements a flexible 5-level hierarchical system for organizing and managing forest lands. This structure supports various forestry management approaches used across Latin America and can be adapted to different organizational needs.
+
+## Hierarchical Structure
+
+<Steps>
+  <Step title="Level 2: Large Properties" icon="mountain">
+    Top-level land units: **FINCA**, **PREDIO**, **HATO**, **FUNDO**, **HACIENDA**, **ABRAE**
+  </Step>
+  <Step title="Level 3: Divisions" icon="map">
+    Management divisions: **COMPARTIMIENTO**, **BLOCK**, **SECCION**, **LOTE**, **ZONA**, **BLOQUE**, **ZONIFICACION**
+  </Step>
+  <Step title="Level 4: Management Units" icon="tree">
+    Operational units: **RODAL**, **PARCELA**, **ENUMERATION**, **UNIDAD_DE_MANEJO**, **CONUCO**, **OTRO_USO**
+  </Step>
+  <Step title="Level 5: Sample Plots" icon="crosshairs">
+    Measurement plots: **REFERENCIA**, **SUBUNIDAD**, **SUBPARCELA**, **MUESTRA**, **SUBMUESTRA**
+  </Step>
+  <Step title="Level 6: Biological Assets" icon="seedling">
+    Individual forest stands and plantations (managed in [Biological Assets](./biological-assets))
+  </Step>
+</Steps>
+
+<Info>
+  The numbering starts at Level 2 because Level 1 is implicitly the **Organization**. Each organization manages its own forest patrimony hierarchy.
+</Info>
+
+## Data Model
+
+### Level 2: Large Properties
+
+```typescript prisma/schema.prisma
+model ForestPatrimonyLevel2 {
+  id                   String                  @id @default(uuid())
+  organizationId       String?
+  code                 String                  @unique
+  name                 String
+  type                 PatrimonyLevel2Type     // FINCA, PREDIO, etc.
+  legalDocumentDate    DateTime?
+  legalStatus          LegalStatus?           // ADQUISICION, ARRIENDO, etc.
+  totalAreaHa          Decimal                 // Total area in hectares
+  centroidLatitude     Decimal?
+  centroidLongitude    Decimal?
+  ownerRepresentative  String?
+  publicRegistryNumber String?
+  publicRegistryDate   DateTime?
+  address              String?
+  lastInfoDate         DateTime?
+  isActive             Boolean                 @default(true)
+  
+  // Relations
+  organization         Organization?
+  neighbors            ForestPatrimonyNeighbor[]
+  level3Units          ForestPatrimonyLevel3[]
+}
+```
+
+### Legal Status Types
+
+```typescript prisma/schema.prisma
+enum LegalStatus {
+  ADQUISICION  // Ownership
+  ARRIENDO     // Rental/Lease
+  USUFRUCTO    // Usufruct
+  COMODATO     // Free loan
+  DECRETO      // Government decree
+}
+```
+
+### Level 3: Divisions
+
+```typescript prisma/schema.prisma
+model ForestPatrimonyLevel3 {
+  id                String                @id @default(uuid())
+  level2Id          String
+  code              String
+  name              String
+  type              PatrimonyLevel3Type
+  totalAreaHa       Decimal
+  centroidLatitude  Decimal?
+  centroidLongitude Decimal?
+  lastInfoDate      DateTime?
+  isActive          Boolean               @default(true)
+  
+  level2            ForestPatrimonyLevel2
+  level4Units       ForestPatrimonyLevel4[]
+}
+```
+
+### Level 4: Management Units
+
+```typescript prisma/schema.prisma
+model ForestPatrimonyLevel4 {
+  id                   String                      @id @default(uuid())
+  level3Id             String
+  code                 String
+  name                 String
+  type                 PatrimonyLevel4Type
+  fscCertificateStatus FscCertificateStatus       @default(NO)
+  currentLandUseName   String?
+  previousLandUseName  String?
+  landUseChangeDate    DateTime?
+  totalAreaHa          Decimal
+  plantableAreaHa      Decimal?
+  rotationPhase        String?
+  previousUse          String?
+  centroidLatitude     Decimal?
+  centroidLongitude    Decimal?
+  lastInfoDate         DateTime?
+  isActive             Boolean                     @default(true)
+  
+  level3               ForestPatrimonyLevel3
+  level5Units          ForestPatrimonyLevel5[]
+  level6Assets         ForestBiologicalAssetLevel6[]
+  geometryVersions     ForestGeometryN4[]          // Geospatial data
+  landPatrimonialVariations LandPatrimonialVariation[]
+}
+```
+
+### Level 5: Sample Plots
+
+```typescript prisma/schema.prisma
+model ForestPatrimonyLevel5 {
+  id                String                @id @default(uuid())
+  level4Id          String
+  code              String
+  name              String
+  type              PatrimonyLevel5Type
+  shapeType         PlotShapeType        // RECTANGULAR, CIRCULAR, etc.
+  dimension1M       Decimal?             // Length or radius
+  dimension2M       Decimal?             // Width
+  dimension3M       Decimal?             // Additional dimension
+  dimension4M       Decimal?             // Additional dimension
+  areaM2            Decimal              // Calculated area in m²
+  centroidLatitude  Decimal?
+  centroidLongitude Decimal?
+  lastInfoDate      DateTime?
+  isActive          Boolean               @default(true)
+  
+  level4            ForestPatrimonyLevel4
+}
+```
+
+### Plot Shape Types
+
+```typescript prisma/schema.prisma
+enum PlotShapeType {
+  RECTANGULAR
+  CUADRADA     // Square
+  CIRCULAR
+  HEXAGONAL
+}
+```
+
+## Creating Patrimony Units
+
+### User Workflow
+
+<Tabs>
+  <Tab title="Level 2: Property">
+    1. Navigate to **Forest Patrimony** → **Level 2**
+    2. Click **New Property**
+    3. Fill in required fields:
+       - Code (unique identifier)
+       - Name
+       - Type (FINCA, PREDIO, etc.)
+       - Total area in hectares
+       - Legal status and documentation
+    4. Optionally add coordinates and neighboring properties
+    5. Save and proceed to create subdivisions
+  </Tab>
+  
+  <Tab title="Level 3: Division">
+    1. Select parent Level 2 property
+    2. Click **New Division**
+    3. Provide:
+       - Code (unique within Level 2)
+       - Name
+       - Type (COMPARTIMIENTO, BLOCK, etc.)
+       - Total area
+    4. Area validation ensures sum ≤ parent area
+  </Tab>
+  
+  <Tab title="Level 4: Management Unit">
+    1. Select parent Level 3 division
+    2. Click **New Management Unit**
+    3. Configure:
+       - Code, name, and type
+       - Current and previous land use
+       - FSC certification status
+       - Plantable area
+       - Rotation phase
+    4. This level supports geospatial geometries
+  </Tab>
+  
+  <Tab title="Level 5: Sample Plot">
+    1. Select parent Level 4 unit
+    2. Click **New Sample Plot**
+    3. Define plot geometry:
+       - Shape type (rectangular, circular, etc.)
+       - Dimensions (auto-calculates area)
+       - Location coordinates
+    4. Area is automatically calculated based on shape
+  </Tab>
+</Tabs>
+
+## API Operations
+
+### Creating Patrimony Units
+
+**POST** `/api/forest/patrimony`
+
+```typescript src/validations/forest-patrimony.schema.ts
+export const createPatrimonySchema = z.discriminatedUnion("level", [
+  z.object({ level: z.literal("2"), data: level2Schema }),
+  z.object({ level: z.literal("3"), data: level3Schema }),
+  z.object({ level: z.literal("4"), data: level4Schema }),
+  z.object({ level: z.literal("5"), data: level5Schema }),
+]);
+```
+
+**Example: Creating Level 2 Property**
+
+```json
+{
+  "level": "2",
+  "data": {
+    "code": "FINCA-001",
+    "name": "Finca San José",
+    "type": "FINCA",
+    "legalStatus": "ADQUISICION",
+    "totalAreaHa": 1500.50,
+    "centroidLatitude": 10.5,
+    "centroidLongitude": -66.9,
+    "ownerRepresentative": "Juan Pérez",
+    "publicRegistryNumber": "REG-2024-0001"
+  }
+}
+```
+
+**Example: Creating Level 4 Management Unit**
+
+```json
+{
+  "level": "4",
+  "data": {
+    "level3Id": "550e8400-e29b-41d4-a716-446655440000",
+    "code": "RODAL-A1",
+    "name": "Rodal A1",
+    "type": "RODAL",
+    "fscCertificateStatus": "SI",
+    "currentLandUseName": "Plantación Pino Caribe",
+    "totalAreaHa": 45.25,
+    "plantableAreaHa": 42.00,
+    "rotationPhase": "Establecimiento"
+  }
+}
+```
+
+### Querying Patrimony
+
+**GET** `/api/forest/patrimony?level=4&parentId={level3Id}&search=RODAL`
+
+**Query Parameters:**
+- `level`: "2", "3", "4", or "5"
+- `page`: Page number (default: 1)
+- `limit`: Items per page (default: 25, max: 100)
+- `parentId`: Filter by parent unit UUID
+- `search`: Text search in code and name
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "id": "...",
+      "code": "RODAL-A1",
+      "name": "Rodal A1",
+      "type": "RODAL",
+      "totalAreaHa": "45.25",
+      "currentLandUseName": "Plantación Pino Caribe",
+      "level3": {
+        "id": "...",
+        "code": "COMP-A",
+        "name": "Compartimiento A"
+      },
+      "_count": {
+        "level6Assets": 3
+      }
+    }
+  ],
+  "pagination": {
+    "total": 45,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 2
+  }
+}
+```
+
+### Updating Patrimony Units
+
+**PATCH** `/api/forest/patrimony`
+
+```json
+{
+  "level": "4",
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "data": {
+    "currentLandUseName": "Bosque Natural Intervenido",
+    "plantableAreaHa": 40.50,
+    "isActive": true
+  }
+}
+```
+
+<Warning>
+  When deactivating a Level 4 unit (`isActive: false`), all associated geospatial geometries are automatically deactivated and versioned.
+</Warning>
+
+### Deleting Patrimony Units
+
+**DELETE** `/api/forest/patrimony`
+
+```json
+{
+  "level": "4",
+  "id": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Deletion Rules:**
+- Cannot delete units with child units
+- Level 4 deletion removes all associated geometries
+- All deletions are logged in audit trail
+
+```typescript src/app/api/forest/patrimony/route.ts
+// Prevent deletion if children exist
+const childrenCount = await prisma.forestPatrimonyLevel3.count({
+  where: { level2Id: parsed.data.id }
+});
+if (childrenCount > 0) {
+  return fail("No se puede eliminar el nivel 2 porque tiene niveles 3 relacionados");
+}
+```
+
+## Neighboring Properties
+
+Level 2 properties can document neighboring lands:
+
+```typescript prisma/schema.prisma
+model ForestPatrimonyNeighbor {
+  id        String                @id @default(uuid())
+  level2Id  String
+  code      String
+  name      String
+  type      String                // "PRIVADO", "PUBLICO", "COMUNAL"
+  
+  level2    ForestPatrimonyLevel2
+}
+```
+
+This information is useful for:
+- Legal documentation
+- Access planning
+- Fire prevention coordination
+- Community relations
+
+## Area Calculation
+
+Level 5 plot areas are automatically calculated based on shape and dimensions:
+
+```typescript src/app/api/forest/patrimony/route.ts
+const areaM2 = calculatePlotAreaM2(parsed.data.data);
+if (!areaM2) {
+  return fail("No se pudo calcular el área del nivel 5");
+}
+
+const created = await prisma.forestPatrimonyLevel5.create({
+  data: {
+    ...parsed.data.data,
+    areaM2, // Auto-calculated
+  },
+});
+```
+
+**Calculation formulas:**
+- **Rectangular**: `dimension1M × dimension2M`
+- **Square**: `dimension1M²`
+- **Circular**: `π × (dimension1M / 2)²`
+- **Hexagonal**: Custom formula based on side length
+
+## Geospatial Integration
+
+Level 4 management units support geospatial geometries:
+
+```typescript prisma/schema.prisma
+model ForestGeometryN4 {
+  id             String    @id @default(uuid())
+  organizationId String
+  level2Id       String
+  level3Id       String
+  level4Id       String
+  geom           Unsupported("geometry(MultiPolygon, 4326)")
+  centroid       Unsupported("geometry(Point, 4326)")
+  superficieHa   Decimal   // Area calculated from geometry
+  validFrom      DateTime  @default(now())
+  validTo        DateTime? // Temporal versioning
+  isActive       Boolean   @default(true)
+  importJobId    String?
+}
+```
+
+**Features:**
+- PostGIS geometries (MultiPolygon)
+- Automatic area calculation from polygons
+- Temporal versioning (valid_from/valid_to)
+- Import from Shapefiles
+
+See [Geospatial Import](./geospatial-import) for details on importing geometries.
+
+## FSC Certification Tracking
+
+Level 4 units track Forest Stewardship Council (FSC) certification:
+
+```typescript prisma/schema.prisma
+enum FscCertificateStatus {
+  SI  // Certified
+  NO  // Not certified
+}
+```
+
+This enables:
+- Certified timber tracking
+- Compliance reporting
+- Chain of custody documentation
+
+## Organization Scoping
+
+All patrimony queries are automatically scoped to the user's organization:
+
+```typescript src/app/api/forest/patrimony/route.ts
+const where: Prisma.ForestPatrimonyLevel2WhereInput = {
+  // Super admins see all, others see only their organization
+  ...(!isSuperAdmin ? { organizationId: organizationId ?? "" } : {}),
+};
+```
+
+**Cross-level filtering:**
+
+```typescript src/app/api/forest/patrimony/route.ts
+// Level 4 query with cascading organization filter
+const where: Prisma.ForestPatrimonyLevel4WhereInput = {
+  ...(!isSuperAdmin ? {
+    level3: {
+      level2: {
+        organizationId: organizationId ?? ""
+      }
+    }
+  } : {}),
+};
+```
+
+## Audit Trail
+
+All patrimony operations are logged:
+
+```typescript src/app/api/forest/patrimony/route.ts
+await prisma.auditLog.create({
+  data: {
+    userId: authResult.session.user.id,
+    action: "CREATE",
+    entityType: "ForestPatrimonyLevel4",
+    entityId: created.id,
+    newValues: parsed.data.data,
+  },
+});
+```
+
+Tracked actions:
+- `CREATE`: New unit created
+- `UPDATE`: Unit modified
+- `DELETE`: Unit removed
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Naming Conventions">
+    - Use consistent code prefixes (e.g., `FINCA-`, `RODAL-`)
+    - Include parent codes in child codes for traceability
+    - Keep names descriptive but concise
+  </Accordion>
+  
+  <Accordion title="Area Management">
+    - Validate child areas sum to parent area
+    - Use hectares consistently for Levels 2-4
+    - Use square meters for Level 5 sample plots
+    - Update areas when geometries change
+  </Accordion>
+  
+  <Accordion title="Data Quality">
+    - Record legal documentation dates
+    - Keep coordinates updated
+    - Document land use changes
+    - Regular audits of active/inactive status
+  </Accordion>
+  
+  <Accordion title="Performance">
+    - Use pagination for large datasets
+    - Index frequently searched fields
+    - Filter by parent ID when querying child levels
+    - Cache frequently accessed hierarchies
+  </Accordion>
+</AccordionGroup>
+
+<Tip>
+  **Hierarchy Design Tips**
+  - Start with Level 2 and work down
+  - Level 3 divisions should align with management boundaries
+  - Level 4 units are the key operational level
+  - Use Level 5 only for permanent sample plots
+  - Consider future subdivisions when allocating areas
+</Tip>
+
+## Common Use Cases
+
+### Use Case 1: Plantation Management
+
+```
+Organization: Reforestadora Nacional
+└─ Level 2 (FINCA): Finca Santa Elena - 2,500 ha
+   └─ Level 3 (COMPARTIMIENTO): Compartimiento Norte - 800 ha
+      └─ Level 4 (RODAL): Rodal N-1 - 45 ha
+         ├─ Level 6: Pino Caribe, 2019 planting
+         └─ Level 5 (MUESTRA): Sample plots for inventory
+```
+
+### Use Case 2: Natural Forest Management
+
+```
+Organization: Reserva Forestal del Estado
+└─ Level 2 (ABRAE): Parque Nacional - 50,000 ha
+   └─ Level 3 (ZONA): Zona de Manejo Especial - 5,000 ha
+      └─ Level 4 (UNIDAD_DE_MANEJO): UM-A - 500 ha
+         └─ Level 6: Natural forest stands by species
+```
+
+## Related Documentation
+
+- [Biological Assets](./biological-assets) - Managing Level 6 forest stands
+- [Land Accounting](./land-accounting) - Tracking land use variations
+- [Geospatial Import](./geospatial-import) - Importing geometries for Level 4
+- [API Reference](/api/patrimony/level2) - Patrimony API endpoints

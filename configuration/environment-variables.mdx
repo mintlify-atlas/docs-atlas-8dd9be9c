@@ -1,0 +1,349 @@
+---
+title: Environment Variables
+description: Complete reference for all environment variables used in CONFOR
+---
+
+## Overview
+
+CONFOR uses environment variables to configure database connections, authentication, worker processes, and export limits. This page documents all available environment variables and their usage.
+
+<Note>
+Create a `.env` file in your project root based on the examples below. Never commit sensitive values to version control.
+</Note>
+
+## Core Configuration
+
+### Database
+
+<ParamField path="DATABASE_URL" type="string" required>
+  PostgreSQL connection string used by Prisma ORM.
+  
+  **Format:** `postgresql://USER:PASSWORD@HOST:PORT/DATABASE`
+  
+  **Example:** `postgresql://postgres:postgres@localhost:5432/app_dev`
+</ParamField>
+
+### Authentication
+
+<ParamField path="NEXTAUTH_SECRET" type="string" required>
+  Secret key for signing and encrypting JWT tokens in NextAuth v5.
+  
+  **Generation:** Run `openssl rand -base64 32` to generate a secure secret.
+  
+  **Example:** `your-super-secret-key-here-minimum-32-chars`
+</ParamField>
+
+<ParamField path="NEXTAUTH_URL" type="string">
+  The canonical URL of your application (used for OAuth callbacks).
+  
+  **Default:** Auto-detected in most cases
+  
+  **Example:** `http://localhost:3000` (development) or `https://confor.yourdomain.com` (production)
+</ParamField>
+
+<ParamField path="NEXT_PUBLIC_APP_URL" type="string">
+  Public-facing application URL accessible from the client side.
+  
+  **Example:** `http://localhost:3000`
+</ParamField>
+
+### Runtime Environment
+
+<ParamField path="NODE_ENV" type="string">
+  Node.js environment mode.
+  
+  **Options:** `development`, `production`, `test`
+  
+  **Default:** `development`
+</ParamField>
+
+## Worker Configuration
+
+### Geospatial Worker
+
+The geospatial worker processes shapefile imports, recalculates Level 4 surfaces, and handles geometry variations.
+
+<ParamField path="GEO_WORKER_INTERVAL_MS" type="number">
+  Polling interval in milliseconds for the worker scheduler.
+  
+  **Default:** `4000` (4 seconds)
+  
+  **Production recommendation:** `5000`
+</ParamField>
+
+<ParamField path="GEO_IMPORT_BATCH_SIZE" type="number">
+  Maximum number of import jobs processed per worker cycle.
+  
+  **Default:** `5`
+  
+  **Production recommendation:** `500` (when using PM2 or dedicated worker server)
+</ParamField>
+
+<ParamField path="GEO_RECALC_BATCH_SIZE" type="number">
+  Maximum number of recalculation jobs processed per worker cycle.
+  
+  **Default:** `10`
+  
+  **Production recommendation:** `200`
+</ParamField>
+
+<ParamField path="GEO_VARIATION_BATCH_SIZE" type="number">
+  Maximum number of variation jobs processed per worker cycle.
+  
+  **Default:** `15`
+  
+  **Production recommendation:** `300`
+</ParamField>
+
+<ParamField path="GEO_WORKER_RUN_ONCE" type="boolean">
+  Execute a single worker cycle and exit (useful for testing).
+  
+  **Default:** `false`
+  
+  **Example:** `true`
+</ParamField>
+
+<ParamField path="GEO_WORKER_SECRET" type="string">
+  Optional secret for securing worker API endpoints.
+  
+  **Example:** `worker-secret-key`
+</ParamField>
+
+## Export Limits
+
+These variables control the maximum number of records that can be exported to Excel format from different modules.
+
+<ResponseField name="Export Limit Variables" type="object">
+  <Expandable title="All Export Variables">
+    <ParamField path="FOREST_BIOLOGICAL_ASSET_EXPORT_MAX_LIMIT" type="number">
+      Maximum records for forest biological asset exports.
+      
+      **Default:** `5000`
+    </ParamField>
+
+    <ParamField path="FOREST_CONFIG_EXPORT_MAX_LIMIT" type="number">
+      Maximum records for forest configuration exports.
+      
+      **Default:** `5000`
+    </ParamField>
+
+    <ParamField path="FOREST_PATRIMONY_EXPORT_MAX_LIMIT" type="number">
+      Maximum records for forest patrimony exports.
+      
+      **Default:** `5000`
+    </ParamField>
+
+    <ParamField path="GENERAL_CONFIG_EXPORT_MAX_LIMIT" type="number">
+      Maximum records for general configuration exports.
+      
+      **Default:** `5000`
+    </ParamField>
+
+    <ParamField path="ORGANIZATIONS_EXPORT_MAX_LIMIT" type="number">
+      Maximum records for organization exports.
+      
+      **Default:** `5000`
+    </ParamField>
+
+    <ParamField path="ROLES_EXPORT_MAX_LIMIT" type="number">
+      Maximum records for role exports.
+      
+      **Default:** `5000`
+    </ParamField>
+
+    <ParamField path="USERS_EXPORT_MAX_LIMIT" type="number">
+      Maximum records for user exports.
+      
+      **Default:** `5000`
+    </ParamField>
+  </Expandable>
+</ResponseField>
+
+## Environment File Examples
+
+<CodeGroup>
+
+```bash .env.development
+# Database
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_dev"
+
+# Authentication
+NEXTAUTH_SECRET="your-development-secret-min-32-chars"
+NEXTAUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+# Runtime
+NODE_ENV="development"
+
+# Geospatial Worker (Development)
+GEO_WORKER_INTERVAL_MS=4000
+GEO_IMPORT_BATCH_SIZE=5
+GEO_RECALC_BATCH_SIZE=10
+GEO_VARIATION_BATCH_SIZE=15
+
+# Export Limits
+FOREST_BIOLOGICAL_ASSET_EXPORT_MAX_LIMIT=5000
+FOREST_CONFIG_EXPORT_MAX_LIMIT=5000
+FOREST_PATRIMONY_EXPORT_MAX_LIMIT=5000
+```
+
+```bash .env.production
+# Database
+DATABASE_URL="postgresql://user:password@prod-host:5432/confor_prod"
+
+# Authentication
+NEXTAUTH_SECRET="your-production-secret-generate-with-openssl"
+NEXTAUTH_URL="https://confor.yourdomain.com"
+NEXT_PUBLIC_APP_URL="https://confor.yourdomain.com"
+
+# Runtime
+NODE_ENV="production"
+
+# Geospatial Worker (Production - optimized for PM2)
+GEO_WORKER_INTERVAL_MS=5000
+GEO_IMPORT_BATCH_SIZE=500
+GEO_RECALC_BATCH_SIZE=200
+GEO_VARIATION_BATCH_SIZE=300
+GEO_WORKER_SECRET="secure-worker-secret"
+
+# Export Limits (Production - higher limits)
+FOREST_BIOLOGICAL_ASSET_EXPORT_MAX_LIMIT=10000
+FOREST_CONFIG_EXPORT_MAX_LIMIT=10000
+FOREST_PATRIMONY_EXPORT_MAX_LIMIT=10000
+GENERAL_CONFIG_EXPORT_MAX_LIMIT=10000
+ORGANIZATIONS_EXPORT_MAX_LIMIT=10000
+ROLES_EXPORT_MAX_LIMIT=10000
+USERS_EXPORT_MAX_LIMIT=10000
+```
+
+```bash .env.test
+# Database (separate test database)
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/confor_test"
+
+# Authentication
+NEXTAUTH_SECRET="test-secret-key-min-32-characters"
+NEXTAUTH_URL="http://localhost:3000"
+NEXT_PUBLIC_APP_URL="http://localhost:3000"
+
+# Runtime
+NODE_ENV="test"
+
+# Worker (run once for tests)
+GEO_WORKER_RUN_ONCE=true
+GEO_WORKER_INTERVAL_MS=1000
+GEO_IMPORT_BATCH_SIZE=2
+GEO_RECALC_BATCH_SIZE=2
+GEO_VARIATION_BATCH_SIZE=2
+
+# Export Limits (lower for tests)
+FOREST_BIOLOGICAL_ASSET_EXPORT_MAX_LIMIT=100
+FOREST_CONFIG_EXPORT_MAX_LIMIT=100
+```
+
+</CodeGroup>
+
+## Security Best Practices
+
+<Warning>
+Never commit `.env` files containing real credentials to version control. Add `.env*` to your `.gitignore` file.
+</Warning>
+
+### Recommendations
+
+1. **Use strong secrets**: Generate `NEXTAUTH_SECRET` with `openssl rand -base64 32`
+2. **Separate environments**: Use different databases and secrets for development, staging, and production
+3. **Rotate secrets**: Regularly rotate authentication secrets in production
+4. **Limit access**: Restrict database user permissions to only what's needed
+5. **Monitor workers**: Set appropriate batch sizes based on your server capacity
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Database connection fails">
+    **Symptoms:** `Error: P1001: Can't reach database server`
+    
+    **Solutions:**
+    - Verify PostgreSQL is running: `docker compose ps` or `pg_isready`
+    - Check `DATABASE_URL` format is correct
+    - Ensure database exists: `psql -U postgres -c "\l"`
+    - Verify network connectivity and firewall rules
+    - Check PostgreSQL logs for authentication errors
+  </Accordion>
+
+  <Accordion title="NextAuth authentication errors">
+    **Symptoms:** `[auth][error] JWTSessionError: Read more at https://errors.authjs.dev`
+    
+    **Solutions:**
+    - Ensure `NEXTAUTH_SECRET` is set and at least 32 characters
+    - Verify `NEXTAUTH_URL` matches your application URL
+    - Clear browser cookies and try again
+    - Check that `trustHost: true` is set in NextAuth config for production
+  </Accordion>
+
+  <Accordion title="Worker not processing jobs">
+    **Symptoms:** Import jobs stuck in PENDING state
+    
+    **Solutions:**
+    - Verify worker is running: `pm2 status` or check process list
+    - Check worker logs: `pm2 logs confor-geo-worker`
+    - Ensure `DATABASE_URL` is accessible from worker process
+    - Verify batch sizes are not set to 0
+    - Check database for locked transactions: `SELECT * FROM pg_locks;`
+  </Accordion>
+
+  <Accordion title="Export fails with timeout">
+    **Symptoms:** Large exports timeout or fail to complete
+    
+    **Solutions:**
+    - Reduce `*_EXPORT_MAX_LIMIT` values
+    - Add pagination to your export queries
+    - Increase server timeout settings
+    - Consider implementing background export jobs
+    - Add indexes to frequently queried columns
+  </Accordion>
+
+  <Accordion title="Environment variables not loading">
+    **Symptoms:** `undefined` values or default fallbacks being used
+    
+    **Solutions:**
+    - Verify `.env` file is in project root directory
+    - Restart development server: `npm run dev`
+    - Check for typos in variable names (case-sensitive)
+    - For Next.js public variables, ensure they start with `NEXT_PUBLIC_`
+    - Rebuild application: `npm run build`
+  </Accordion>
+</AccordionGroup>
+
+## Variable Reference Table
+
+| Variable | Type | Required | Default | Description |
+|----------|------|----------|---------|-------------|
+| `DATABASE_URL` | string | Yes | - | PostgreSQL connection string |
+| `NEXTAUTH_SECRET` | string | Yes | - | NextAuth JWT signing secret |
+| `NEXTAUTH_URL` | string | No | Auto-detected | Application canonical URL |
+| `NEXT_PUBLIC_APP_URL` | string | No | - | Public-facing app URL |
+| `NODE_ENV` | string | No | `development` | Runtime environment |
+| `GEO_WORKER_INTERVAL_MS` | number | No | `4000` | Worker polling interval (ms) |
+| `GEO_IMPORT_BATCH_SIZE` | number | No | `5` | Import jobs per cycle |
+| `GEO_RECALC_BATCH_SIZE` | number | No | `10` | Recalc jobs per cycle |
+| `GEO_VARIATION_BATCH_SIZE` | number | No | `15` | Variation jobs per cycle |
+| `GEO_WORKER_RUN_ONCE` | boolean | No | `false` | Single cycle execution |
+| `GEO_WORKER_SECRET` | string | No | - | Worker API endpoint secret |
+| `FOREST_BIOLOGICAL_ASSET_EXPORT_MAX_LIMIT` | number | No | `5000` | Bio asset export limit |
+| `FOREST_CONFIG_EXPORT_MAX_LIMIT` | number | No | `5000` | Forest config export limit |
+| `FOREST_PATRIMONY_EXPORT_MAX_LIMIT` | number | No | `5000` | Patrimony export limit |
+| `GENERAL_CONFIG_EXPORT_MAX_LIMIT` | number | No | `5000` | General config export limit |
+| `ORGANIZATIONS_EXPORT_MAX_LIMIT` | number | No | `5000` | Organizations export limit |
+| `ROLES_EXPORT_MAX_LIMIT` | number | No | `5000` | Roles export limit |
+| `USERS_EXPORT_MAX_LIMIT` | number | No | `5000` | Users export limit |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Database Setup" icon="database" href="/configuration/database-setup">
+    Configure PostgreSQL and run migrations
+  </Card>
+  <Card title="Worker Setup" icon="gear" href="/configuration/worker-setup">
+    Set up geospatial processing workers
+  </Card>
+</CardGroup>

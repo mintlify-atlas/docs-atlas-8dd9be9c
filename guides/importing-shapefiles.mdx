@@ -1,0 +1,473 @@
+---
+title: Importing Shapefiles
+description: Learn how to import geospatial data for Level 4 forest units (rodales) in CONFOR
+---
+
+# Importing Shapefiles
+
+CONFOR supports importing geospatial data in Shapefile format to define and update Level 4 forest patrimony units (rodales). This guide explains the file requirements, import process, and troubleshooting.
+
+## Overview
+
+Shapefile import in CONFOR enables:
+
+- **Bulk geospatial data loading**: Import multiple rodales with geometries
+- **Hierarchical linking**: Connect rodales to existing Level 2 (finca) and Level 3 (lote) units
+- **Area calculation**: Automatic calculation of surface areas in hectares
+- **Land use tracking**: Record current and previous land use, with variation dates
+- **Asynchronous processing**: Large imports are processed in the background by a geospatial worker
+
+## Shapefile Requirements
+
+### Required Files in ZIP
+
+Your shapefile must be packaged as a ZIP archive containing these files:
+
+| File Extension | Required | Purpose |
+|----------------|----------|----------|
+| `.shp` | Yes | Main geometry file (polygons) |
+| `.shx` | Yes | Shape index file |
+| `.dbf` | Yes | Attribute data (properties) |
+| `.prj` | Yes | Coordinate reference system (CRS) |
+
+<Warning>
+  The ZIP must contain **all four files**. Missing any file will cause import to fail with an error like:
+  
+  `ZIP incompleto. Faltan archivos obligatorios: .prj, .shx`
+</Warning>
+
+### Spatial Requirements
+
+| Requirement | Value |
+|-------------|-------|
+| **Geometry Type** | Polygon or MultiPolygon |
+| **CRS** | Any CRS that can be transformed to EPSG:4326 (WGS84) |
+| **Validity** | Geometries must be valid (no self-intersections, gaps, etc.) |
+| **Coordinate System** | Recommended: EPSG:4326, EPSG:3857, or local UTM zones |
+
+<Info>
+  CONFOR automatically transforms geometries to EPSG:4326 for storage. Your input CRS is detected from the `.prj` file.
+</Info>
+
+### Required Attributes (DBF Columns)
+
+Your `.dbf` file must contain these columns for hierarchical linking:
+
+| Attribute | Required | Description | Example |
+|-----------|----------|-------------|----------|
+| `nivel2_id` | Yes | Code of Level 2 unit (finca/predio) | `FINCA-01` |
+| `nivel3_id` | Yes | Code of Level 3 unit (lote/compartimento) | `LOTE-01` |
+| `nivel4_id` | Yes | Code of Level 4 unit (rodal) | `RODAL-001` |
+
+<Note>
+  The combination of `nivel2_id + nivel3_id + nivel4_id` uniquely identifies each rodal in CONFOR.
+</Note>
+
+### Optional Attributes
+
+Include these columns for richer data import:
+
+| Attribute | Format | Description | Example |
+|-----------|--------|-------------|----------|
+| `nombre_rodal` | Text | Rodal display name | `Rodal Norte` |
+| `fuente` | Text | Data source | `Levantamiento GPS` |
+| `fecha_levantamiento` | `YYYY-MM-DD` | Survey date | `2026-03-01` |
+| `observacion` | Text | Notes/comments | `Sin novedad` |
+
+### CSV Template Reference
+
+From the README, here's a sample CSV structure (for reference only—you must use shapefile):
+
+```csv
+nivel2_id,nivel3_id,nivel4_id,nombre_rodal,fuente,fecha_levantamiento,observacion
+FINCA-01,LOTE-01,RODAL-001,Rodal Norte,Levantamiento GPS,2026-03-01,Sin novedad
+FINCA-01,LOTE-01,RODAL-002,Rodal Sur,Drone survey,2026-03-05,Área con pendiente
+FINCA-01,LOTE-02,RODAL-003,Rodal Este,Manual survey,2026-03-10,Certificación FSC
+```
+
+## Import Process
+
+<Steps>
+  <Step title="Navigate to Import Page">
+    Go to **Forest Patrimony** → **Importación Shapefile** (or similar path, depending on your navigation setup).
+    
+    <Note>
+      You need `forest-patrimony:CREATE` or `forest-patrimony:UPDATE` permission to import shapefiles.
+    </Note>
+  </Step>
+  
+  <Step title="Prepare Your ZIP File">
+    Ensure your ZIP contains:
+    - Exactly one `.shp` file
+    - Exactly one `.shx` file
+    - Exactly one `.dbf` file
+    - Exactly one `.prj` file
+    
+    Example structure:
+    ```
+    rodales.zip
+    ├── rodales.shp
+    ├── rodales.shx
+    ├── rodales.dbf
+    └── rodales.prj
+    ```
+  </Step>
+  
+  <Step title="Fill in Variation Metadata (Optional)">
+    If this import represents a land use change, provide:
+    
+    - **Fecha de variación**: Date when the land use changed (YYYY-MM-DD)
+    - **Observaciones**: Notes about the variation
+    
+    <Info>
+      Variation metadata is stored in the import job and applied to all imported rodales.
+    </Info>
+  </Step>
+  
+  <Step title="Upload ZIP File">
+    Click **Choose File** and select your ZIP archive.
+    
+    Click **Upload** or **Importar**.
+    
+    CONFOR validates the ZIP structure before accepting the upload.
+  </Step>
+  
+  <Step title="Track Import Job">
+    After upload, CONFOR creates a `GeoImportJob` with status `PENDING`.
+    
+    The geospatial worker processes the job asynchronously with these stages:
+    
+    1. **EXTRACTING**: Unzipping files
+    2. **VALIDATING**: Checking CRS, geometry validity, attributes
+    3. **PROCESSING**: Transforming geometries, calculating areas, linking hierarchy
+    4. **COMPLETED**: Import finished successfully
+    5. **FAILED**: Error occurred (check `errorMessage` field)
+    
+    <Info>
+      Import jobs are polled by the `pnpm worker:geo` process (see README). Monitor progress via `/api/forest/geo/import/{jobId}`.
+    </Info>
+  </Step>
+  
+  <Step title="Review Import Results">
+    When the job completes, check the import summary:
+    
+    - **Total Records**: Total features in shapefile
+    - **Processed Records**: Successfully imported rodales
+    - **Failed Records**: Features that failed validation
+    
+    Failed items are logged in `geo_import_job_items` with error messages.
+  </Step>
+</Steps>
+
+## How Hierarchical Linking Works
+
+### Organization-Scoped Matching
+
+CONFOR resolves hierarchy codes **within your organization only**:
+
+1. **Organization ID**: Taken from the authenticated user, **not** from the shapefile
+2. **Level 2 (Finca)**: Matches `nivel2_id` against `ForestPatrimonyLevel2.code` where `organizationId = user.organizationId`
+3. **Level 3 (Lote)**: Matches `nivel3_id` against `ForestPatrimonyLevel3.code` where `level2Id = matchedLevel2.id`
+4. **Level 4 (Rodal)**: Matches `nivel4_id` against `ForestPatrimonyLevel4.code` where `level3Id = matchedLevel3.id`
+
+<Warning>
+  **Security Note**: The `organization_id` is **never** read from the shapefile. All imports are scoped to the current user's organization. Cross-organization imports are rejected.
+</Warning>
+
+### What Happens on Import
+
+For each feature in the shapefile:
+
+1. **Validate attributes**: Ensure `nivel2_id`, `nivel3_id`, `nivel4_id` are present
+2. **Resolve hierarchy**: Match codes to existing database records
+3. **Transform geometry**: Convert CRS to EPSG:4326
+4. **Calculate area**: Compute surface area in hectares using geodesic calculation
+5. **Store geometry version**: Create `ForestGeometryN4` record with:
+   - `geom`: MultiPolygon geometry
+   - `centroid`: Calculated centroid point
+   - `superficieHa`: Area in hectares
+   - `validFrom`: Current timestamp
+   - `isActive`: true
+6. **Link to import job**: Set `importJobId` for traceability
+
+### Handling Duplicates
+
+If a rodal with the same `nivel2_id + nivel3_id + nivel4_id` already exists:
+
+- **Previous geometry versions**: Set `isActive = false`, `validTo = now()`
+- **New geometry version**: Create with `isActive = true`, `validFrom = now()`
+
+This maintains a temporal history of geometry changes.
+
+## Geospatial Worker
+
+### Worker Configuration
+
+From the README, the worker is configured via environment variables:
+
+```bash
+# Worker polling interval (milliseconds)
+GEO_WORKER_INTERVAL_MS=4000
+
+# Max import jobs per cycle
+GEO_IMPORT_BATCH_SIZE=5
+
+# Max recalc jobs per cycle
+GEO_RECALC_BATCH_SIZE=10
+
+# Run once and exit (for manual/cron execution)
+GEO_WORKER_RUN_ONCE=true
+```
+
+### Starting the Worker
+
+**Continuous mode**:
+```bash
+pnpm worker:geo
+```
+
+**Single-run mode** (useful for cron jobs):
+```bash
+pnpm worker:geo:once
+```
+
+<Info>
+  The worker must be running for shapefile imports to complete. Without the worker, jobs remain in `PENDING` state.
+</Info>
+
+### Manual Job Triggering
+
+If you don't have the worker running continuously, you can trigger job processing manually:
+
+```bash
+curl -X POST "http://localhost:3000/api/forest/geo/import/worker" \
+  -H "Content-Type: application/json" \
+  -H "x-worker-secret: YOUR_SECRET" \
+  -d '{
+    "jobId": "uuid-of-pending-job",
+    "mode": "import"
+  }'
+```
+
+## Validation Checklist
+
+Before importing, verify:
+
+<Accordion title="Attribute Completeness">
+  ✅ `nivel2_id`, `nivel3_id`, `nivel4_id` present in **all** features
+  
+  ✅ No null or empty values in required attributes
+  
+  ✅ No duplicate `nivel2_id + nivel3_id + nivel4_id` combinations **within the same import batch**
+</Accordion>
+
+<Accordion title="Hierarchy Existence">
+  ✅ All referenced `nivel2_id` codes exist in your organization's Level 2 units
+  
+  ✅ All referenced `nivel3_id` codes exist under their corresponding `nivel2_id`
+  
+  ✅ If updating existing rodales, `nivel4_id` codes should exist; if creating new ones, they should not
+</Accordion>
+
+<Accordion title="ZIP Structure">
+  ✅ ZIP includes `.shp`, `.shx`, `.dbf`, `.prj` files
+  
+  ✅ All files have the same base name (e.g., `rodales.shp`, `rodales.dbf`)
+  
+  ✅ No extra folders or nested ZIP files
+</Accordion>
+
+<Accordion title="Spatial Validity">
+  ✅ `.prj` file contains a valid CRS definition
+  
+  ✅ Geometries are type Polygon or MultiPolygon (not Point, LineString, etc.)
+  
+  ✅ No invalid geometries (check with QGIS → Vector → Geometry Tools → Check Validity)
+  
+  ✅ CRS is appropriate for your region (e.g., UTM zone matching your location)
+</Accordion>
+
+## Downloading Import Templates
+
+CONFOR provides an endpoint to download CSV/Excel templates:
+
+```bash
+# CSV template
+curl "https://your-confor-instance.com/api/forest/geo/import?format=csv" \
+  -o plantilla_importacion_nivel4.csv
+
+# Excel template
+curl "https://your-confor-instance.com/api/forest/geo/import?format=xlsx" \
+  -o plantilla_importacion_nivel4.xlsx
+```
+
+<Info>
+  These templates show the expected attribute structure. For shapefile imports, replicate these columns in your `.dbf` file.
+</Info>
+
+## Troubleshooting
+
+### Import Job Stuck in PENDING
+
+**Cause**: Geospatial worker is not running.
+
+**Solution**: Start the worker with `pnpm worker:geo`.
+
+### Import Fails with "ZIP incompleto"
+
+**Cause**: One or more required files (`.shp`, `.shx`, `.dbf`, `.prj`) are missing from the ZIP.
+
+**Solution**: Ensure the ZIP contains all four files. Check file extensions (case-sensitive on some systems).
+
+### Geometry Validation Errors
+
+**Cause**: Invalid geometries (self-intersections, unclosed polygons, etc.).
+
+**Solution**:
+1. Open shapefile in QGIS
+2. Run **Vector → Geometry Tools → Check Validity**
+3. Fix invalid geometries with **Vector → Geometry Tools → Fix Geometries**
+4. Re-export and re-import
+
+### Hierarchy Code Not Found
+
+**Cause**: `nivel2_id`, `nivel3_id`, or `nivel4_id` doesn't match existing records in your organization.
+
+**Solution**:
+1. Check the codes in your shapefile `.dbf` (open with Excel or QGIS attribute table)
+2. Compare against existing codes in CONFOR:
+   - **Level 2**: Check `/api/forest/patrimony?level=2`
+   - **Level 3**: Check `/api/forest/patrimony?level=3&parentId={nivel2Id}`
+3. Update codes in shapefile or create missing hierarchy units in CONFOR first
+
+### CRS Transformation Errors
+
+**Cause**: Missing or invalid `.prj` file, or unsupported CRS.
+
+**Solution**:
+1. Verify `.prj` contains a valid WKT CRS definition (open in text editor)
+2. Re-project shapefile to a common CRS (EPSG:4326 or local UTM) in QGIS:
+   - **Vector → Data Management Tools → Reproject Layer**
+3. Re-export with `.prj` included
+
+### Import Completes but Features Missing
+
+**Cause**: Features failed validation (logged as `FAILED` in `geo_import_job_items`).
+
+**Solution**:
+1. Query import job items:
+   ```sql
+   SELECT feature_index, status, message 
+   FROM geo_import_job_items 
+   WHERE job_id = 'your-job-uuid' AND status = 'FAILED';
+   ```
+2. Review `message` field for each failed feature
+3. Fix issues in shapefile (missing attributes, invalid codes, etc.)
+4. Re-import
+
+### Organization Security Error
+
+**Error**: `El usuario no tiene una organización asociada`
+
+**Cause**: Your user account doesn't have an `organizationId`.
+
+**Solution**: Contact system administrator to assign you to an organization.
+
+## API Reference
+
+### Upload Shapefile
+
+```http
+POST /api/forest/geo/import
+Content-Type: multipart/form-data
+
+Form fields:
+  file: (binary ZIP file)
+  variationDate: (optional) YYYY-MM-DD
+  variationNotes: (optional) text
+
+Response (202 Accepted):
+{
+  "success": true,
+  "data": {
+    "jobId": "uuid",
+    "status": "PENDING",
+    "message": "Archivo recibido. El worker procesará la importación en segundo plano."
+  }
+}
+```
+
+### Check Job Status
+
+```http
+GET /api/forest/geo/import/{jobId}
+
+Response:
+{
+  "success": true,
+  "data": {
+    "id": "uuid",
+    "status": "COMPLETED",
+    "totalRecords": 150,
+    "processedRecords": 148,
+    "failedRecords": 2,
+    "errorMessage": null,
+    "startedAt": "2026-03-09T10:00:00Z",
+    "completedAt": "2026-03-09T10:05:32Z"
+  }
+}
+```
+
+### Trigger Worker (Manual)
+
+```http
+POST /api/forest/geo/import/worker
+Content-Type: application/json
+x-worker-secret: YOUR_SECRET
+
+{
+  "jobId": "uuid",
+  "mode": "import"
+}
+```
+
+## Best Practices
+
+<Accordion title="Validate Data Before Import">
+  - Use QGIS to check geometry validity
+  - Verify attribute completeness (no null required fields)
+  - Test with a small subset (5-10 features) before full import
+  - Ensure CRS is correctly defined in `.prj`
+</Accordion>
+
+<Accordion title="Organize Imports by Date">
+  - Name ZIP files with dates: `rodales_2026-03-09.zip`
+  - Use `variationDate` to track when land use changed
+  - Keep source shapefiles archived for audit trail
+</Accordion>
+
+<Accordion title="Monitor Worker Health">
+  - Run worker as a systemd service or PM2 process (see README)
+  - Set up monitoring/alerts for worker downtime
+  - Check worker logs regularly: `pm2 logs confor-geo-worker`
+</Accordion>
+
+<Accordion title="Handle Large Imports Incrementally">
+  - Split very large shapefiles (>1000 features) into batches
+  - Import during off-peak hours to reduce system load
+  - Monitor database disk space (geometries consume significant storage)
+</Accordion>
+
+<Accordion title="Document Hierarchy Codes">
+  - Maintain a mapping document of:
+    - Level 2 codes → Finca names
+    - Level 3 codes → Lote names
+    - Level 4 codes → Rodal names
+  - Share with field teams to ensure consistent coding
+</Accordion>
+
+## Related Guides
+
+- [Forest Hierarchy](/guides/forest-hierarchy) - Understand Level 2/3/4/5 structure
+- [Managing Users](/guides/managing-users) - Permission requirements
+- [Audit Logs](/guides/audit-logs) - Track import history

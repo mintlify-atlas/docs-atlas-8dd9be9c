@@ -1,0 +1,388 @@
+---
+title: 'Level 4 - Stands & Parcels'
+api: 'GET /api/forest/patrimony'
+---
+
+## Overview
+
+Level 4 represents stands, parcels, or management units within Level 3 compartments. These are the primary operational units for forest management and contain detailed information about land use and plantable areas.
+
+## Hierarchy
+
+```
+Level 2 (FINCA, PREDIO, etc.)
+  └─ Level 3 (Compartments, Blocks, Sections)
+      └─ Level 4 (RODAL, PARCELA, etc.) ← You are here
+          └─ Level 5 (Reference Units, Sub-parcels)
+```
+
+**Parent Relationship:** Each Level 4 unit must belong to a Level 3 unit via `level3Id`.
+
+## List Level 4 Units
+
+<ParamField query="level" type="string" required>
+  Must be set to `"4"` to retrieve Level 4 units
+</ParamField>
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="25">
+  Number of items per page
+</ParamField>
+
+<ParamField query="parentId" type="string">
+  Filter by Level 3 parent ID (UUID)
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search by code or name (case-insensitive)
+</ParamField>
+
+### Response
+
+<ResponseField name="items" type="array">
+  <ResponseField name="id" type="string">
+    Unique identifier (UUID)
+  </ResponseField>
+
+  <ResponseField name="level3Id" type="string">
+    Parent Level 3 unit ID (UUID)
+  </ResponseField>
+
+  <ResponseField name="code" type="string">
+    Unique code for the unit (max 80 characters, unique within parent)
+  </ResponseField>
+
+  <ResponseField name="name" type="string">
+    Name of the stand or parcel
+  </ResponseField>
+
+  <ResponseField name="type" type="enum">
+    Type of management unit. Possible values:
+    - `RODAL` - Stand
+    - `PARCELA` - Parcel
+    - `ENUMERATION` - Enumeration
+    - `UNIDAD_DE_MANEJO` - Management Unit
+    - `CONUCO` - Small farm plot
+    - `OTRO_USO` - Other use
+  </ResponseField>
+
+  <ResponseField name="fscCertificateStatus" type="enum" required>
+    FSC certification status: `SI` (yes) or `NO` (no)
+  </ResponseField>
+
+  <ResponseField name="currentLandUseName" type="string">
+    Current land use name (max 255 characters)
+  </ResponseField>
+
+  <ResponseField name="previousLandUseName" type="string">
+    Previous land use name (max 255 characters)
+  </ResponseField>
+
+  <ResponseField name="landUseChangeDate" type="date">
+    Date when land use changed
+  </ResponseField>
+
+  <ResponseField name="totalAreaHa" type="number">
+    Total area in hectares
+  </ResponseField>
+
+  <ResponseField name="plantableAreaHa" type="number">
+    Plantable area in hectares
+  </ResponseField>
+
+  <ResponseField name="rotationPhase" type="string">
+    Rotation phase description (max 120 characters)
+  </ResponseField>
+
+  <ResponseField name="previousUse" type="string">
+    Description of previous use (max 255 characters)
+  </ResponseField>
+
+  <ResponseField name="centroidLatitude" type="number">
+    Latitude of centroid (-90 to 90)
+  </ResponseField>
+
+  <ResponseField name="centroidLongitude" type="number">
+    Longitude of centroid (-180 to 180)
+  </ResponseField>
+
+  <ResponseField name="lastInfoDate" type="date">
+    Date of last information update
+  </ResponseField>
+
+  <ResponseField name="isActive" type="boolean" default="true">
+    Whether the unit is active
+  </ResponseField>
+
+  <ResponseField name="createdAt" type="datetime">
+    Creation timestamp
+  </ResponseField>
+
+  <ResponseField name="updatedAt" type="datetime">
+    Last update timestamp
+  </ResponseField>
+
+  <ResponseField name="level3" type="object">
+    Parent Level 3 unit information
+    <ResponseField name="id" type="string">
+      Level 3 ID
+    </ResponseField>
+    <ResponseField name="code" type="string">
+      Level 3 code
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Level 3 name
+    </ResponseField>
+  </ResponseField>
+
+  <ResponseField name="_count" type="object">
+    Related counts
+    <ResponseField name="level6Assets" type="number">
+      Number of biological assets (Level 6) associated with this unit
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  <ResponseField name="total" type="number">
+    Total number of items
+  </ResponseField>
+
+  <ResponseField name="page" type="number">
+    Current page number
+  </ResponseField>
+
+  <ResponseField name="limit" type="number">
+    Items per page
+  </ResponseField>
+
+  <ResponseField name="totalPages" type="number">
+    Total number of pages
+  </ResponseField>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.confor.app/api/forest/patrimony?level=4&parentId=660e8400-e29b-41d4-a716-446655440001" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.confor.app/api/forest/patrimony?level=4&parentId=660e8400-e29b-41d4-a716-446655440001',
+  {
+    headers: {
+      'Authorization': 'Bearer YOUR_TOKEN'
+    }
+  }
+);
+const data = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "items": [
+    {
+      "id": "770e8400-e29b-41d4-a716-446655440002",
+      "level3Id": "660e8400-e29b-41d4-a716-446655440001",
+      "code": "RODAL-01",
+      "name": "Rodal Pino Caribe",
+      "type": "RODAL",
+      "fscCertificateStatus": "SI",
+      "currentLandUseName": "Plantación comercial",
+      "previousLandUseName": "Pastizal",
+      "landUseChangeDate": "2020-03-15T00:00:00Z",
+      "totalAreaHa": 120.75,
+      "plantableAreaHa": 115.50,
+      "rotationPhase": "Fase de crecimiento",
+      "previousUse": "Ganadería extensiva",
+      "centroidLatitude": 10.525,
+      "centroidLongitude": -66.875,
+      "lastInfoDate": "2024-01-10T00:00:00Z",
+      "isActive": true,
+      "createdAt": "2024-01-15T10:40:00Z",
+      "updatedAt": "2024-01-15T10:40:00Z",
+      "level3": {
+        "id": "660e8400-e29b-41d4-a716-446655440001",
+        "code": "COMP-A",
+        "name": "Compartimiento Norte"
+      },
+      "_count": {
+        "level6Assets": 3
+      }
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 1
+  }
+}
+```
+</ResponseExample>
+
+---
+
+## Create Level 4 Unit
+
+<api>POST /api/forest/patrimony</api>
+
+Creating a Level 4 unit will automatically enqueue a geometry recalculation job to update spatial data.
+
+### Request Body
+
+<ParamField body="level" type="string" required>
+  Must be set to `"4"` to create a Level 4 unit
+</ParamField>
+
+<ParamField body="data" type="object" required>
+  <ParamField body="level3Id" type="string" required>
+    Parent Level 3 unit ID (UUID)
+  </ParamField>
+
+  <ParamField body="code" type="string" required>
+    Unique code within parent (1-80 characters)
+  </ParamField>
+
+  <ParamField body="name" type="string" required>
+    Name of the stand or parcel (2-255 characters)
+  </ParamField>
+
+  <ParamField body="type" type="enum" required>
+    Type: `RODAL`, `PARCELA`, `ENUMERATION`, `UNIDAD_DE_MANEJO`, `CONUCO`, `OTRO_USO`
+  </ParamField>
+
+  <ParamField body="fscCertificateStatus" type="enum" required>
+    FSC certification: `SI` or `NO`
+  </ParamField>
+
+  <ParamField body="currentLandUseName" type="string">
+    Current land use name (max 255 characters)
+  </ParamField>
+
+  <ParamField body="previousLandUseName" type="string">
+    Previous land use name (max 255 characters)
+  </ParamField>
+
+  <ParamField body="totalAreaHa" type="number" required>
+    Total area in hectares (must be non-negative)
+  </ParamField>
+
+  <ParamField body="plantableAreaHa" type="number">
+    Plantable area in hectares (must be non-negative)
+  </ParamField>
+
+  <ParamField body="rotationPhase" type="string">
+    Rotation phase description (max 120 characters)
+  </ParamField>
+
+  <ParamField body="previousUse" type="string">
+    Description of previous use (max 255 characters)
+  </ParamField>
+
+  <ParamField body="centroidLatitude" type="number">
+    Latitude of centroid (-90 to 90)
+  </ParamField>
+
+  <ParamField body="centroidLongitude" type="number">
+    Longitude of centroid (-180 to 180)
+  </ParamField>
+
+  <ParamField body="lastInfoDate" type="date">
+    Date of last information update
+  </ParamField>
+
+  <ParamField body="isActive" type="boolean" default="true">
+    Whether the unit is active
+  </ParamField>
+</ParamField>
+
+### Response
+
+Returns the created Level 4 unit with status code 201, including the parent Level 3 information.
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://api.confor.app/api/forest/patrimony" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "level": "4",
+    "data": {
+      "level3Id": "660e8400-e29b-41d4-a716-446655440001",
+      "code": "RODAL-01",
+      "name": "Rodal Pino Caribe",
+      "type": "RODAL",
+      "fscCertificateStatus": "SI",
+      "currentLandUseName": "Plantación comercial",
+      "previousLandUseName": "Pastizal",
+      "totalAreaHa": 120.75,
+      "plantableAreaHa": 115.50,
+      "rotationPhase": "Fase de crecimiento"
+    }
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.confor.app/api/forest/patrimony', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    level: '4',
+    data: {
+      level3Id: '660e8400-e29b-41d4-a716-446655440001',
+      code: 'RODAL-01',
+      name: 'Rodal Pino Caribe',
+      type: 'RODAL',
+      fscCertificateStatus: 'SI',
+      currentLandUseName: 'Plantación comercial',
+      previousLandUseName: 'Pastizal',
+      totalAreaHa: 120.75,
+      plantableAreaHa: 115.50,
+      rotationPhase: 'Fase de crecimiento'
+    }
+  })
+});
+const data = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "id": "770e8400-e29b-41d4-a716-446655440002",
+  "level3Id": "660e8400-e29b-41d4-a716-446655440001",
+  "code": "RODAL-01",
+  "name": "Rodal Pino Caribe",
+  "type": "RODAL",
+  "fscCertificateStatus": "SI",
+  "currentLandUseName": "Plantación comercial",
+  "previousLandUseName": "Pastizal",
+  "landUseChangeDate": null,
+  "totalAreaHa": 120.75,
+  "plantableAreaHa": 115.50,
+  "rotationPhase": "Fase de crecimiento",
+  "previousUse": null,
+  "centroidLatitude": null,
+  "centroidLongitude": null,
+  "lastInfoDate": null,
+  "isActive": true,
+  "createdAt": "2024-01-15T10:40:00Z",
+  "updatedAt": "2024-01-15T10:40:00Z",
+  "level3": {
+    "id": "660e8400-e29b-41d4-a716-446655440001",
+    "code": "COMP-A",
+    "name": "Compartimiento Norte"
+  }
+}
+```
+</ResponseExample>

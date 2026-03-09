@@ -1,0 +1,368 @@
+---
+title: Managing Users
+description: Learn how to invite, manage, and configure user accounts in CONFOR
+---
+
+# Managing Users
+
+CONFOR provides comprehensive user management capabilities to control access to your forestry accounting system. This guide covers user creation, role assignment, and user lifecycle management.
+
+## Overview
+
+User management in CONFOR is built on a multi-organization architecture where:
+
+- Each user belongs to a single organization
+- Users are assigned specific roles that determine their permissions
+- User accounts can have different statuses based on verification and approval workflows
+
+## User Statuses
+
+Users in CONFOR can have the following statuses:
+
+- **ACTIVE**: User account is fully active and can access the system
+- **INACTIVE**: User account is temporarily disabled
+- **PENDING_VERIFICATION**: User has been invited but hasn't verified their email
+- **LOCKED**: User account is locked (e.g., due to failed login attempts)
+- **DELETED**: User account has been soft-deleted
+
+## Inviting a New User
+
+<Steps>
+  <Step title="Navigate to Users Page">
+    From the dashboard, go to **Users** in the main navigation menu.
+  </Step>
+  
+  <Step title="Click Invite User">
+    Click the **+ Invitar Usuario** button in the top-right corner.
+    
+    <Note>
+      You need the `users:CREATE` or `users:ADMIN` permission to invite users.
+    </Note>
+  </Step>
+  
+  <Step title="Enter User Details">
+    Fill in the invitation form:
+    
+    - **Email**: User's email address (required, must be unique)
+    - **Temporary Password**: Optional. If left empty, a random password is generated
+    - **Role**: Select the role to assign (e.g., USER, ADMIN)
+    - **Organization**: Select the organization this user will belong to
+    
+    <Warning>
+      If you don't provide a temporary password, the user will be created with status `PENDING_VERIFICATION`. If you provide a password, the user status will be `ACTIVE`.
+    </Warning>
+  </Step>
+  
+  <Step title="Save the Invitation">
+    Click **Guardar invitación** to create the user account.
+    
+    The user will appear in the users table with their assigned role and organization.
+  </Step>
+</Steps>
+
+## Editing User Details
+
+To modify an existing user's information:
+
+<Steps>
+  <Step title="Locate the User">
+    Use the search bar to filter users by:
+    - Email address
+    - First name
+    - Last name
+    
+    You can also sort the table by clicking column headers:
+    - Email
+    - Role
+    - Organization
+    - Registration Date
+    - Status
+  </Step>
+  
+  <Step title="Click Edit">
+    In the user row, click the **Editar** button under the Actions column.
+  </Step>
+  
+  <Step title="Modify User Properties">
+    Update any of the following:
+    
+    - **Role**: Change the user's assigned role
+    - **Organization**: Move the user to a different organization
+    - **Status**: Change the user's account status (ACTIVE, INACTIVE, etc.)
+  </Step>
+  
+  <Step title="Save Changes">
+    Click **Guardar cambios** to apply the updates.
+    
+    All changes are recorded in the audit log (see `/api/audit`).
+  </Step>
+</Steps>
+
+## Approving Pending Users
+
+Users created without a password will have `PENDING_VERIFICATION` status. To activate them:
+
+<Steps>
+  <Step title="Find Pending Users">
+    Users with pending status display an **Aprobar** button in the Actions column.
+  </Step>
+  
+  <Step title="Click Approve">
+    Click the **Aprobar** button to change the user status to `ACTIVE`.
+    
+    <Info>
+      You need the `users:UPDATE` or `users:ADMIN` permission to approve users.
+    </Info>
+  </Step>
+</Steps>
+
+## Deleting Users
+
+To remove a user from the system:
+
+<Steps>
+  <Step title="Locate the User">
+    Find the user you want to delete in the users table.
+  </Step>
+  
+  <Step title="Click Delete">
+    Click the **Eliminar** button in the Actions column.
+    
+    A confirmation dialog will appear asking you to confirm the deletion.
+  </Step>
+  
+  <Step title="Confirm Deletion">
+    In the notification toast, click **Eliminar** again to confirm.
+    
+    <Warning>
+      User deletion is permanent and cannot be undone. The user will be removed from the database.
+    </Warning>
+  </Step>
+</Steps>
+
+## Importing Users (Bulk Upload)
+
+For large-scale user provisioning, CONFOR supports CSV and Excel imports:
+
+<Steps>
+  <Step title="Prepare Your Import File">
+    Create a CSV or Excel file with the following columns:
+    
+    - `email`: User email (required)
+    - `firstName`: First name (optional)
+    - `lastName`: Last name (optional)
+    - `roleSlug`: Role identifier (e.g., USER, ADMIN)
+    - `organizationId`: UUID of the organization
+    - `password`: Temporary password (optional)
+  </Step>
+  
+  <Step title="Click Import">
+    On the Users page, click the **Importar** button.
+  </Step>
+  
+  <Step title="Select File">
+    Choose your CSV or Excel file from your computer.
+    
+    Supported formats:
+    - `.csv` (UTF-8 encoded)
+    - `.xlsx` (Microsoft Excel)
+  </Step>
+  
+  <Step title="Review Results">
+    After upload, CONFOR displays an import summary:
+    
+    - **Created**: Number of new users created
+    - **Updated**: Number of existing users updated
+    - **Skipped**: Number of rows skipped (e.g., duplicates)
+    - **Errors**: Number of rows with validation errors
+    
+    <Info>
+      Import is partial: valid rows are processed even if some rows have errors.
+    </Info>
+  </Step>
+</Steps>
+
+## Exporting Users
+
+You can export user data for backup or analysis:
+
+<Steps>
+  <Step title="Configure Export Settings">
+    In the table toolbar:
+    
+    - Set **Límite de exportación** to control how many records to export (default: 100)
+    - Use search and filters to narrow down which users to export
+  </Step>
+  
+  <Step title="Choose Format">
+    Click either:
+    - **Exportar CSV**: Exports to comma-separated values
+    - **Exportar Excel**: Exports to .xlsx format
+  </Step>
+  
+  <Step title="Download File">
+    The export file downloads automatically with a filename like:
+    - `users.csv`
+    - `users.xlsx`
+  </Step>
+</Steps>
+
+## Searching and Filtering
+
+The users table supports powerful search and filtering:
+
+### Search
+
+The search box filters users by:
+- Email (partial match, case-insensitive)
+- First name
+- Last name
+
+### Pagination
+
+- **Items per page**: Adjust using the limit selector (10, 25, 50, 100)
+- **Navigation**: Use Previous/Next buttons to browse pages
+- **Total count**: Displays total matching users
+
+### Sorting
+
+Click column headers to sort by:
+- **Email** (alphabetical)
+- **Role** (alphabetical)
+- **Organization** (alphabetical)
+- **Registration Date** (chronological)
+- **Status** (categorical)
+
+Click again to toggle between ascending/descending order.
+
+## User API Endpoints
+
+For programmatic access, CONFOR exposes these REST endpoints:
+
+```
+GET    /api/users              # List users (with pagination)
+POST   /api/users              # Create a new user
+PATCH  /api/users/{id}         # Update user details
+DELETE /api/users/{id}         # Delete a user
+POST   /api/users/import       # Bulk import users
+GET    /api/users/export       # Export users (CSV/Excel)
+```
+
+### Example: List Users with Pagination
+
+```bash
+curl "https://your-confor-instance.com/api/users?page=1&limit=25&sortBy=email&sortOrder=asc"
+```
+
+### Example: Create a User
+
+```bash
+curl -X POST "https://your-confor-instance.com/api/users" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "roleSlug": "USER",
+    "organizationId": "uuid-here",
+    "password": "TempPass123"
+  }'
+```
+
+## Permissions Required
+
+To perform user management actions, you need these permissions:
+
+| Action | Required Permission |
+|--------|--------------------|
+| View users list | `users:READ` or `users:ADMIN` |
+| Invite/create users | `users:CREATE` or `users:ADMIN` |
+| Edit user details | `users:UPDATE` or `users:ADMIN` |
+| Approve users | `users:UPDATE` or `users:ADMIN` |
+| Delete users | `users:DELETE` or `users:ADMIN` |
+| Export users | `users:EXPORT` or `users:ADMIN` |
+| Import users | `users:CREATE` or `users:ADMIN` |
+
+<Note>
+  The `users:ADMIN` permission grants all user management capabilities.
+</Note>
+
+## Multi-Organization Considerations
+
+### Organization Scope
+
+- **Regular users**: Can only see and manage users within their own organization
+- **SUPER_ADMIN users**: Can view and manage users across all organizations
+
+### Organization Assignment
+
+- Every user must belong to exactly one organization
+- Organization assignment cannot be empty
+- Moving users between organizations updates their `organizationId`
+
+## Best Practices
+
+<Accordion title="Use Strong Temporary Passwords">
+  When providing temporary passwords, ensure they:
+  - Are at least 8 characters long
+  - Contain uppercase, lowercase, numbers, and special characters
+  - Are communicated securely (not via email)
+  
+  Consider using the auto-generated password option instead.
+</Accordion>
+
+<Accordion title="Regularly Review User Accounts">
+  - Audit inactive users quarterly
+  - Remove users who have left the organization
+  - Check for users with excessive permissions
+  - Review `PENDING_VERIFICATION` accounts that haven't activated
+</Accordion>
+
+<Accordion title="Assign Minimal Permissions">
+  Follow the principle of least privilege:
+  - Start with basic roles (e.g., USER)
+  - Grant elevated permissions only when needed
+  - Use custom roles for specific department needs
+</Accordion>
+
+<Accordion title="Document Organization Structure">
+  Maintain documentation about:
+  - Which organization each department belongs to
+  - Role naming conventions
+  - User provisioning workflows
+</Accordion>
+
+## Troubleshooting
+
+### User Can't Login
+
+**Check user status**: Ensure the user has `ACTIVE` status, not `PENDING_VERIFICATION`, `INACTIVE`, or `LOCKED`.
+
+**Password issues**: If the user forgot their password, use the password reset flow (not covered in user management).
+
+**Role permissions**: Verify the user has at least one role with login permissions.
+
+### Import Fails
+
+**File format**: Ensure the file is valid CSV (UTF-8) or Excel (.xlsx).
+
+**Column headers**: Check that column names match exactly (case-sensitive).
+
+**Data validation**: Review error messages for specific row issues:
+- Invalid email format
+- Duplicate emails
+- Missing required fields
+- Invalid organization UUIDs
+- Invalid role slugs
+
+### Export is Empty
+
+**Permissions**: Verify you have `users:EXPORT` or `users:ADMIN` permission.
+
+**Search filters**: Clear any active search filters that might exclude all users.
+
+**Export limit**: Increase the export limit if you expect more than the default 100 users.
+
+## Related Guides
+
+- [Configuring Roles](/guides/configuring-roles) - Learn how to create and manage roles
+- [Audit Logs](/guides/audit-logs) - Track user management actions
+- [Forest Hierarchy](/guides/forest-hierarchy) - Understand organizational structure

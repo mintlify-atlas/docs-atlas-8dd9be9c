@@ -1,0 +1,151 @@
+---
+title: Introduction to CONFOR
+description: Enterprise forestry accounting and patrimony management system
+---
+
+## What is CONFOR?
+
+CONFOR is a comprehensive forestry accounting SaaS platform designed for enterprise-level forest patrimony management, biological asset tracking, and geospatial data processing. Built with modern web technologies, it provides organizations with powerful tools to manage their forest resources, track land variations, and maintain detailed hierarchical forest inventories.
+
+## Key Features
+
+### Multi-Organization Support
+
+CONFOR is built from the ground up as a multi-tenant system:
+
+- **Secure organization isolation** - Each organization's data is completely isolated
+- **Role-based access control (RBAC)** - Granular permissions system with custom roles
+- **User management** - Comprehensive user administration with status tracking
+- **Audit logging** - Complete activity tracking for compliance and security
+
+### Forest Patrimony Management
+
+Manage your forest assets through a 5-level hierarchical structure:
+
+- **Level 2 (Finca/Predio)** - Top-level properties with legal status and ownership
+- **Level 3 (Lote/Compartimiento)** - Compartments and sections within properties
+- **Level 4 (Rodal/Parcela)** - Individual stands with FSC certification tracking
+- **Level 5 (Subunidad)** - Plot-level data with geometric shapes and dimensions
+- **Level 6 (Biological Assets)** - Tree inventory, volume calculations, and IMA classification
+
+<Note>
+The system supports multiple terminology types for each level (e.g., Finca, Predio, Hato, ABRAE for Level 2) to accommodate different regional naming conventions.
+</Note>
+
+### Geospatial Processing
+
+- **Shapefile import** - Upload and process ZIP files containing .shp, .shx, .dbf, .prj
+- **Automatic geometry validation** - Validates and transforms to EPSG:4326
+- **Area calculation** - Automatic surface area computation in hectares
+- **Centroid calculation** - Geographic center point for each unit
+- **Asynchronous worker** - Background job processing for large imports
+
+### Land Patrimonial Variations
+
+Track changes in land use and value over time:
+
+- **Land use change tracking** - Before/after documentation
+- **Patrimonial value calculations** - USD-based valuation with delta tracking
+- **Split and merge operations** - Geometric land parcel operations
+- **Variation status workflow** - Pending → Processed → Annulled states
+
+### Biological Asset Accounting
+
+Comprehensive forest inventory management:
+
+- **Species and genetic material tracking** - Full taxonomy support
+- **Growth metrics** - Dominant height, quadratic diameter, basal area
+- **Volume calculations** - With and without bark, per hectare and total
+- **IMA classification** - Growth class categorization (I-V)
+- **Cost tracking** - Actual cost in USD per asset
+
+## Technology Stack
+
+### Frontend
+
+- **Next.js 16** - React-based framework with App Router
+- **React 19** - Latest React with server components
+- **TypeScript** - Type-safe development
+- **Tailwind CSS** - Utility-first styling
+- **Leaflet & React-Leaflet** - Interactive mapping
+- **TanStack Query** - Data fetching and caching
+- **Recharts** - Data visualization
+
+### Backend
+
+- **Node.js 20+** - Runtime environment
+- **Next.js API Routes** - Serverless API endpoints
+- **Prisma ORM** - Type-safe database client
+- **NextAuth v5** - Authentication with credentials provider
+- **PostgreSQL** - Primary database with PostGIS extension
+- **Redis** - Caching and session storage
+
+### Geospatial
+
+- **PostGIS** - Spatial database extension
+- **shpjs** - Shapefile parsing library
+- **@turf/turf** - Geospatial analysis
+- **EPSG:4326** - Standard coordinate system (WGS84)
+
+### Development Tools
+
+- **Prisma Studio** - Database GUI
+- **Docker Compose** - Development environment
+- **PM2** - Production process management
+- **tsx** - TypeScript execution
+
+## Who Should Use CONFOR?
+
+CONFOR is designed for:
+
+- **Forest management companies** - Managing multiple properties and plantations
+- **Timber producers** - Tracking biological assets and inventory
+- **Conservation organizations** - Managing protected areas and ABRAE territories
+- **Forestry consultants** - Providing services to multiple client organizations
+- **Research institutions** - Conducting forest inventory and growth studies
+- **Government agencies** - Overseeing forest resources and land use
+
+<Warning>
+CONFOR requires Node.js 20+ and PostgreSQL with PostGIS extension. Docker is recommended for development but optional for production deployments.
+</Warning>
+
+## System Architecture
+
+CONFOR follows a modern, scalable architecture:
+
+```
+┌─────────────────────────────────────────────────┐
+│           Next.js Application (Port 3000)       │
+│  ┌─────────────┐  ┌──────────────┐             │
+│  │  App Router │  │  API Routes  │             │
+│  │  (React 19) │  │  (REST API)  │             │
+│  └─────────────┘  └──────────────┘             │
+└─────────────────────────────────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│            Prisma ORM (Type-safe)               │
+└─────────────────────────────────────────────────┘
+                       ↓
+┌──────────────────┐        ┌─────────────────────┐
+│   PostgreSQL     │        │   Redis (Optional)  │
+│   + PostGIS      │        │   Session Storage   │
+└──────────────────┘        └─────────────────────┘
+                       ↓
+┌─────────────────────────────────────────────────┐
+│      Geo Worker (Async Processing)              │
+│  - Shapefile imports (batch size: 5)            │
+│  - Surface recalculation (batch size: 10)       │
+│  - Interval: 4000ms (configurable)              │
+└─────────────────────────────────────────────────┘
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started with CONFOR in minutes - create your first organization and forest unit
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Complete installation guide with prerequisites and environment setup
+  </Card>
+</CardGroup>

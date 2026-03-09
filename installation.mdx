@@ -1,0 +1,746 @@
+---
+title: Installation Guide
+description: Complete guide to installing and configuring CONFOR on your server
+---
+
+## Prerequisites
+
+Before installing CONFOR, ensure your system meets these requirements:
+
+### Required Software
+
+- **Node.js** 20 or higher ([Download](https://nodejs.org/))
+- **Docker** and Docker Compose (recommended) or standalone PostgreSQL 15+
+- **Git** for cloning the repository
+
+### Recommended System Requirements
+
+- **RAM**: 4GB minimum, 8GB recommended
+- **CPU**: 2 cores minimum, 4 cores recommended
+- **Storage**: 10GB minimum (more for geospatial data)
+- **OS**: Linux, macOS, or Windows with WSL2
+
+<Warning>
+CONFOR requires PostgreSQL with **PostGIS extension** for geospatial features. The Docker setup includes this automatically.
+</Warning>
+
+## Installation Methods
+
+Choose your preferred installation method:
+
+<Tabs>
+  <Tab title="Docker (Recommended)">
+    Docker provides the easiest setup with all dependencies included.
+  </Tab>
+  <Tab title="Manual Setup">
+    Install dependencies manually for custom configurations.
+  </Tab>
+  <Tab title="PM2 Production">
+    Production deployment with PM2 process manager.
+  </Tab>
+</Tabs>
+
+## Method 1: Docker Installation (Recommended)
+
+<Steps>
+  <Step title="Clone the Repository">
+    
+    Clone the CONFOR repository to your local machine:
+
+    <CodeGroup>
+    ```bash npm
+    git clone https://github.com/your-org/confor.git
+    cd confor
+    ```
+
+    ```bash pnpm
+    git clone https://github.com/your-org/confor.git
+    cd confor
+    ```
+    </CodeGroup>
+
+  </Step>
+
+  <Step title="Install Dependencies">
+    
+    Install Node.js packages:
+
+    <CodeGroup>
+    ```bash npm
+    npm install
+    ```
+
+    ```bash pnpm
+    pnpm install
+    ```
+    </CodeGroup>
+
+    <Note>
+    The project uses **pnpm** by default, but npm and yarn are also supported.
+    </Note>
+
+  </Step>
+
+  <Step title="Start Docker Services">
+    
+    Launch PostgreSQL and Redis containers:
+
+    ```bash
+    docker compose up -d
+    ```
+
+    This starts:
+    - **PostgreSQL 15** on port 5432
+    - **Redis 7** on port 6379 (optional, for caching)
+
+    Verify containers are running:
+
+    ```bash
+    docker compose ps
+    ```
+
+    Expected output:
+
+    ```
+    NAME                SERVICE    STATUS
+    confor-postgres-1   postgres   running
+    confor-redis-1      redis      running
+    ```
+
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    
+    Create a `.env` file in the project root:
+
+    ```bash
+    touch .env
+    ```
+
+    Add the following configuration:
+
+    ```bash .env
+    # Database
+    DATABASE_URL="postgresql://postgres:postgres@localhost:5432/app_dev?schema=public"
+
+    # NextAuth
+    NEXTAUTH_SECRET="your-secret-key-here-min-32-chars"
+    NEXTAUTH_URL="http://localhost:3000"
+
+    # Redis (optional)
+    REDIS_URL="redis://localhost:6379"
+
+    # Geo Worker Configuration (optional)
+    GEO_WORKER_INTERVAL_MS=4000
+    GEO_IMPORT_BATCH_SIZE=5
+    GEO_RECALC_BATCH_SIZE=10
+
+    # Email (optional, for notifications)
+    SMTP_HOST="smtp.example.com"
+    SMTP_PORT=587
+    SMTP_USER="your-email@example.com"
+    SMTP_PASS="your-password"
+    SMTP_FROM="noreply@yourcompany.com"
+    ```
+
+    <Tip>
+    Generate a secure NEXTAUTH_SECRET with:
+    ```bash
+    openssl rand -base64 32
+    ```
+    </Tip>
+
+  </Step>
+
+  <Step title="Generate Prisma Client">
+    
+    Generate the Prisma database client:
+
+    <CodeGroup>
+    ```bash npm
+    npm run db:generate
+    ```
+
+    ```bash pnpm
+    pnpm db:generate
+    ```
+    </CodeGroup>
+
+    This reads `prisma/schema.prisma` and generates type-safe database models.
+
+  </Step>
+
+  <Step title="Run Database Migrations">
+    
+    Apply database migrations to create tables:
+
+    <CodeGroup>
+    ```bash npm
+    npm run db:migrate
+    ```
+
+    ```bash pnpm
+    pnpm db:migrate
+    ```
+    </CodeGroup>
+
+    <Note>
+    The first migration includes **PostGIS extension** activation and table partitioning setup for audit logs.
+    </Note>
+
+    Expected output:
+
+    ```
+    Prisma Migrate applied the following migration(s):
+
+    migrations/
+      └─ 0001_extensions_partitioning/
+         └─ migration.sql
+      └─ 0002_initial_schema/
+         └─ migration.sql
+    ```
+
+  </Step>
+
+  <Step title="Seed Initial Data">
+    
+    Load default data including admin user, roles, and modules:
+
+    <CodeGroup>
+    ```bash npm
+    npm run db:seed
+    ```
+
+    ```bash pnpm
+    pnpm db:seed
+    ```
+    </CodeGroup>
+
+    This creates:
+
+    - **Default admin user**:
+      - Email: `admin@example.com`
+      - Password: `Admin1234`
+    - **System roles**: ADMIN, USER, VIEWER
+    - **Module permissions**: Dashboard, Users, Patrimony, etc.
+    - **Default organization**: "Por defecto"
+
+    <Warning>
+    Change the default admin password immediately after first login in production environments.
+    </Warning>
+
+  </Step>
+
+  <Step title="Start Development Server">
+    
+    Launch the Next.js development server:
+
+    <CodeGroup>
+    ```bash npm
+    npm run dev
+    ```
+
+    ```bash pnpm
+    pnpm dev
+    ```
+    </CodeGroup>
+
+    The application will be available at:
+
+    ```
+    http://localhost:3000
+    ```
+
+    <Tip>
+    The dev server includes hot module replacement (HMR) for rapid development.
+    </Tip>
+
+  </Step>
+
+  <Step title="Start Geo Worker (Optional)">
+    
+    In a separate terminal, start the geospatial processing worker:
+
+    <CodeGroup>
+    ```bash npm
+    npm run worker:geo
+    ```
+
+    ```bash pnpm
+    pnpm worker:geo
+    ```
+    </CodeGroup>
+
+    The worker processes:
+
+    - **Shapefile imports** - Extracting, validating, and storing geometries
+    - **Area recalculations** - Updating Level 2/3 totals from Level 4 changes
+
+    Worker configuration:
+
+    ```typescript
+    // Default settings
+    {
+      intervalMs: 4000,           // Poll every 4 seconds
+      importBatchSize: 5,         // Process 5 imports per cycle
+      recalcBatchSize: 10         // Process 10 recalcs per cycle
+    }
+    ```
+
+    <Note>
+    For testing, run a single cycle with:
+    ```bash
+    pnpm worker:geo:once
+    ```
+    </Note>
+
+  </Step>
+</Steps>
+
+## Method 2: Manual Setup (Without Docker)
+
+<Steps>
+  <Step title="Install PostgreSQL">
+    
+    Install PostgreSQL 15+ with PostGIS:
+
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt update
+    sudo apt install postgresql-15 postgresql-15-postgis-3
+    ```
+
+    **macOS (Homebrew):**
+    ```bash
+    brew install postgresql@15 postgis
+    brew services start postgresql@15
+    ```
+
+    **Windows:**
+    Download from [PostgreSQL.org](https://www.postgresql.org/download/windows/) and install PostGIS via Stack Builder.
+
+  </Step>
+
+  <Step title="Create Database">
+    
+    Create the application database:
+
+    ```bash
+    psql -U postgres
+    ```
+
+    ```sql
+    CREATE DATABASE app_dev;
+    \c app_dev
+    CREATE EXTENSION IF NOT EXISTS postgis;
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    \q
+    ```
+
+  </Step>
+
+  <Step title="Install Redis (Optional)">
+    
+    **Ubuntu/Debian:**
+    ```bash
+    sudo apt install redis-server
+    sudo systemctl start redis
+    ```
+
+    **macOS:**
+    ```bash
+    brew install redis
+    brew services start redis
+    ```
+
+  </Step>
+
+  <Step title="Configure Environment">
+    
+    Update your `.env` with the correct database connection:
+
+    ```bash
+    DATABASE_URL="postgresql://postgres:your-password@localhost:5432/app_dev?schema=public"
+    ```
+
+  </Step>
+
+  <Step title="Continue with Standard Setup">
+    
+    Follow steps 2-8 from the Docker installation method above (Install Dependencies through Start Geo Worker).
+
+  </Step>
+</Steps>
+
+## Method 3: PM2 Production Deployment
+
+For production deployments on Windows or Linux servers:
+
+<Steps>
+  <Step title="Install PM2 Globally">
+    
+    ```bash
+    npm install -g pm2
+    ```
+
+  </Step>
+
+  <Step title="Build for Production">
+    
+    <CodeGroup>
+    ```bash npm
+    npm run build
+    ```
+
+    ```bash pnpm
+    pnpm build
+    ```
+    </CodeGroup>
+
+    This creates an optimized production build in `.next/`.
+
+  </Step>
+
+  <Step title="Configure PM2 Ecosystem">
+    
+    The project includes `ecosystem.config.cjs`:
+
+    ```javascript ecosystem.config.cjs
+    module.exports = {
+      apps: [
+        {
+          name: 'confor-web',
+          script: 'node_modules/next/dist/bin/next',
+          args: 'start',
+          env: {
+            NODE_ENV: 'production',
+            PORT: 3000
+          },
+          instances: 1,
+          exec_mode: 'cluster',
+          max_memory_restart: '1G'
+        },
+        {
+          name: 'confor-geo-worker',
+          script: 'node_modules/tsx/dist/cli.mjs',
+          args: 'src/workers/geo-worker-scheduler.ts',
+          env: {
+            NODE_ENV: 'production'
+          },
+          instances: 1,
+          exec_mode: 'fork'
+        }
+      ]
+    };
+    ```
+
+  </Step>
+
+  <Step title="Start with PM2">
+    
+    ```bash
+    pm2 start ecosystem.config.cjs
+    ```
+
+    Monitor processes:
+
+    ```bash
+    pm2 status
+    pm2 logs confor-web
+    pm2 logs confor-geo-worker
+    ```
+
+  </Step>
+
+  <Step title="Enable Auto-Restart on Boot">
+    
+    **Linux:**
+    ```bash
+    pm2 startup systemd
+    pm2 save
+    ```
+
+    **Windows:**
+    ```bash
+    pm2 startup
+    # Follow the generated command
+    pm2 save
+    ```
+
+  </Step>
+
+  <Step title="Manage PM2 Processes">
+    
+    ```bash
+    # Restart
+    pm2 restart confor-web
+    pm2 restart confor-geo-worker
+
+    # Stop
+    pm2 stop all
+
+    # Delete
+    pm2 delete all
+
+    # Monitor
+    pm2 monit
+    ```
+
+  </Step>
+</Steps>
+
+## Database Schema Overview
+
+CONFOR uses a comprehensive PostgreSQL schema with 40+ tables:
+
+### Core Authentication Tables
+
+- `User` - User accounts with organization membership
+- `Role` - Custom roles per organization
+- `Permission` - Granular module-level permissions
+- `Session` - Active user sessions
+- `AuditLog` - Partitioned audit trail (monthly partitions)
+
+### Forest Patrimony Tables
+
+- `ForestPatrimonyLevel2` - Top-level properties (Finca/Predio)
+- `ForestPatrimonyLevel3` - Compartments (Lote)
+- `ForestPatrimonyLevel4` - Stands (Rodal)
+- `ForestPatrimonyLevel5` - Plots (Subunidad)
+- `ForestBiologicalAssetLevel6` - Biological assets and inventory
+
+### Geospatial Tables
+
+- `ForestGeometryN4` - Polygon geometries (MultiPolygon, EPSG:4326)
+- `GeoImportJob` - Shapefile import job tracking
+- `GeoImportJobItem` - Individual feature import status
+- `ForestGeometryRecalcJob` - Area recalculation queue
+
+### Variation Tracking
+
+- `LandPatrimonialVariation` - Land use changes and valuation
+- `GeoLandVariationJob` - Split/merge geometric operations
+
+## Environment Variables Reference
+
+### Required Variables
+
+```bash
+# Database connection (required)
+DATABASE_URL="postgresql://user:password@host:5432/database?schema=public"
+
+# Authentication secret (required, min 32 chars)
+NEXTAUTH_SECRET="generated-secret-key"
+
+# Application URL (required)
+NEXTAUTH_URL="http://localhost:3000"
+```
+
+### Optional Variables
+
+```bash
+# Redis for caching and sessions
+REDIS_URL="redis://localhost:6379"
+
+# Geo Worker Performance
+GEO_WORKER_INTERVAL_MS=4000        # Polling interval (milliseconds)
+GEO_IMPORT_BATCH_SIZE=5            # Import jobs per cycle
+GEO_RECALC_BATCH_SIZE=10           # Recalc jobs per cycle
+GEO_WORKER_RUN_ONCE=false          # Set to 'true' for single run
+
+# Email Configuration (for notifications)
+SMTP_HOST="smtp.gmail.com"
+SMTP_PORT=587
+SMTP_SECURE=false
+SMTP_USER="your-email@gmail.com"
+SMTP_PASS="your-app-password"
+SMTP_FROM="CONFOR <noreply@yourcompany.com>"
+
+# Logging
+LOG_LEVEL="info"                   # debug | info | warn | error
+```
+
+## Post-Installation Steps
+
+<Steps>
+  <Step title="Verify Installation">
+    
+    Check that all services are running:
+
+    ```bash
+    # Database
+    psql -U postgres -c "SELECT version();"
+
+    # Redis (if using)
+    redis-cli ping
+
+    # Application
+    curl http://localhost:3000/api/health
+    ```
+
+  </Step>
+
+  <Step title="Login as Admin">
+    
+    Navigate to `http://localhost:3000` and login:
+
+    - Email: `admin@example.com`
+    - Password: `Admin1234`
+
+    <Warning>
+    Immediately change this password in production!
+    </Warning>
+
+  </Step>
+
+  <Step title="Create Your Organization">
+    
+    Navigate to **Organizaciones** and create your first organization:
+
+    ```typescript
+    {
+      name: "Your Company Name",
+      slug: "your-company",         // URL-friendly identifier
+      description: "Company description",
+      website: "https://yourcompany.com",
+      isActive: true
+    }
+    ```
+
+  </Step>
+
+  <Step title="Configure Roles and Permissions">
+    
+    Navigate to **Roles** to customize permissions for your organization.
+
+    Default roles:
+    - **ADMIN** - Full system access
+    - **USER** - Standard user with read/write
+    - **VIEWER** - Read-only access
+
+  </Step>
+
+  <Step title="Set Up Audit Log Partitions">
+    
+    For production, create monthly partitions:
+
+    ```bash
+    npm run db:partition -- --year 2026 --month 4
+    ```
+
+    This runs `scripts/create-audit-partition.ts` to create a partition for April 2026.
+
+    <Tip>
+    Schedule this monthly with cron or a system scheduler.
+    </Tip>
+
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+### Database Connection Fails
+
+**Error**: `Error: P1001: Can't reach database server`
+
+**Solutions**:
+1. Verify PostgreSQL is running: `docker compose ps` or `systemctl status postgresql`
+2. Check DATABASE_URL format in `.env`
+3. Ensure firewall allows port 5432
+4. Test connection: `psql -U postgres -h localhost`
+
+### PostGIS Extension Not Found
+
+**Error**: `ERROR: could not open extension control file`
+
+**Solution**:
+```sql
+-- Connect to database
+\c app_dev
+
+-- Install extension
+CREATE EXTENSION IF NOT EXISTS postgis;
+
+-- Verify
+SELECT PostGIS_version();
+```
+
+### Prisma Migration Fails
+
+**Error**: `Migration failed to apply`
+
+**Solution**:
+1. Reset database (development only):
+   ```bash
+   npm run db:push -- --force-reset
+   ```
+2. Manually apply migrations:
+   ```bash
+   psql -U postgres -d app_dev -f prisma/migrations/0001_extensions_partitioning/migration.sql
+   ```
+
+### Port Already in Use
+
+**Error**: `EADDRINUSE: address already in use :::3000`
+
+**Solutions**:
+1. Kill existing process:
+   ```bash
+   # Linux/Mac
+   lsof -ti:3000 | xargs kill -9
+
+   # Windows
+   netstat -ano | findstr :3000
+   taskkill /PID <PID> /F
+   ```
+2. Use different port:
+   ```bash
+   PORT=3001 npm run dev
+   ```
+
+### Geo Worker Not Processing Jobs
+
+**Symptoms**: Shapefile imports stuck in PENDING status
+
+**Solutions**:
+1. Verify worker is running:
+   ```bash
+   pm2 logs confor-geo-worker
+   ```
+2. Check job queue:
+   ```sql
+   SELECT id, status, file_name, error_message 
+   FROM geo_import_jobs 
+   WHERE status = 'PENDING' 
+   ORDER BY created_at DESC;
+   ```
+3. Manually trigger processing:
+   ```bash
+   GEO_WORKER_RUN_ONCE=true npm run worker:geo
+   ```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Create your first forest patrimony structure
+  </Card>
+  <Card title="User Management" icon="users" href="/guides/managing-users">
+    Add team members and configure access control
+  </Card>
+  <Card title="Shapefile Import" icon="map" href="/guides/importing-shapefiles">
+    Upload geospatial data for your forest stands
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/login">
+    Integrate CONFOR with external systems
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+For additional support:
+
+- **GitHub Issues**: Report bugs or request features
+- **Documentation**: Comprehensive guides for all features
+- **Community**: Join discussions with other CONFOR users
+- **Support**: Contact your system administrator or vendor

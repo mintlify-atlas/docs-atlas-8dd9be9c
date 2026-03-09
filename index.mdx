@@ -1,97 +1,77 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Welcome to CONFOR"
+description: "Sistema de contabilidad forestal para gestión de patrimonio, activos biológicos y contabilidad de tierras"
 ---
 
-## Setting up
+# Welcome to CONFOR
 
-Get your documentation site up and running in minutes.
+CONFOR is a comprehensive forestry accounting system designed for managing forest patrimony, biological assets, and land accounting. Built for forestry professionals and organizations, CONFOR provides powerful tools for tracking and managing forest resources with precision and efficiency.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+## Key Features
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Forest Patrimony Management" icon="tree" href="/features/forest-patrimony">
+    Manage hierarchical forest structures from Finca to Rodal with complete traceability
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Multi-Organization Support" icon="building" href="/features/organizations">
+    Secure multi-tenant architecture with complete data isolation between organizations
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Geospatial Import" icon="map" href="/features/geospatial-import">
+    Import and process shapefile data with automated background workers
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Biological Assets" icon="seedling" href="/features/biological-assets">
+    Track commercial forestry assets with IMA classification and FSC certification
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Get Started
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get CONFOR up and running in minutes
+  </Card>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Complete installation and setup instructions
+  </Card>
+  <Card title="User Guides" icon="book" href="/guides/forest-hierarchy">
+    Learn how to use CONFOR's core features
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/login">
+    Explore the complete API documentation
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Core Capabilities
 
-## Need inspiration?
+<AccordionGroup>
+  <Accordion title="Hierarchical Forest Structure" icon="sitemap">
+    CONFOR implements a five-level hierarchical structure for organizing forest patrimony:
+    - **Nivel 2**: Finca, Predio, Hato, Fundo, Hacienda, or ABRAE
+    - **Nivel 3**: Compartimiento, Block, Sección, Lote, or Zona
+    - **Nivel 4**: Rodal, Parcela, Enumeration, or Unidad de Manejo
+    - **Nivel 5**: Referencia, Subunidad, Subparcela, or Muestra
+  </Accordion>
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+  <Accordion title="Role-Based Access Control" icon="shield">
+    Comprehensive RBAC system with granular permissions for CREATE, READ, UPDATE, DELETE, EXPORT, and ADMIN operations across all resources.
+  </Accordion>
+
+  <Accordion title="Audit Logging" icon="file-lines">
+    Complete audit trail with partitioned storage for all system operations including authentication, data modifications, and administrative actions.
+  </Accordion>
+
+  <Accordion title="Background Processing" icon="gears">
+    Dedicated geospatial worker for processing shapefile imports and recalculating forest areas asynchronously.
+  </Accordion>
+</AccordionGroup>
+
+## Built With Modern Technology
+
+CONFOR is built with a powerful, modern technology stack:
+
+- **Next.js 16** with App Router for the frontend
+- **PostgreSQL** with PostGIS for geospatial data
+- **Prisma ORM** for type-safe database operations
+- **NextAuth v5** for authentication and authorization
+- **Tailwind CSS** for responsive, beautiful interfaces
+- **Leaflet** for interactive map visualization

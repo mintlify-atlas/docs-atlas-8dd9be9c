@@ -1,0 +1,566 @@
+---
+title: Land Accounting & Variations
+description: Track and account for land use changes with patrimonial impact valuation and geospatial integration
+---
+
+## Overview
+
+The **Land Accounting** module tracks changes in land use at the Level 4 management unit level, calculating the patrimonial (asset value) impact of these transitions. This is critical for:
+
+- Financial accounting and reporting
+- Sustainable land management monitoring
+- Compliance with forestry regulations
+- Investment decision support
+
+<Info>
+  Land patrimonial variations are automatically generated from geospatial operations (split/merge) or can be tracked through land use changes over time.
+</Info>
+
+## Key Capabilities
+
+<CardGroup cols={2}>
+  <Card title="Land Use Tracking" icon="map">
+    Monitor transitions between forest, agricultural, and other land uses
+  </Card>
+  <Card title="Patrimonial Valuation" icon="dollar-sign">
+    Calculate financial impact of land use changes on asset value
+  </Card>
+  <Card title="Status Workflow" icon="rotate">
+    Pending → Processed → Annulled status management
+  </Card>
+  <Card title="Geospatial Integration" icon="globe">
+    Automatically generate variations from geometry operations
+  </Card>
+</CardGroup>
+
+## Data Model
+
+### Land Patrimonial Variation
+
+```typescript prisma/schema.prisma
+model LandPatrimonialVariation {
+  id                      String                     @id @default(uuid())
+  organizationId          String
+  level4Id                String                     // Management unit affected
+  
+  // Land Use Change
+  previousLandUseName     String?
+  newLandUseName          String
+  affectedAreaHa          Decimal                    // Area changed (hectares)
+  
+  // Valuation
+  referenceValueBeforeUsd Decimal                    @default(0) // Value/ha before
+  referenceValueAfterUsd  Decimal                    @default(0) // Value/ha after
+  totalValueBeforeUsd     Decimal                    @default(0) // Total before
+  totalValueAfterUsd      Decimal                    @default(0) // Total after
+  patrimonialDeltaUsd     Decimal                    @default(0) // Net change
+  
+  // Classification
+  kind                    PatrimonialVariationKind   // Impact type
+  status                  PatrimonialVariationStatus @default(PENDIENTE)
+  
+  // Tracking
+  variationDate           DateTime
+  notes                   String?
+  processedAt             DateTime?
+  createdById             String
+  processedById           String?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  
+  // Relations
+  organization            Organization
+  level4                  ForestPatrimonyLevel4
+  createdBy               User
+  processedBy             User?
+}
+```
+
+### Variation Status
+
+```typescript prisma/schema.prisma
+enum PatrimonialVariationStatus {
+  PENDIENTE  // Pending approval
+  PROCESADA  // Processed/approved
+  ANULADA    // Annulled/cancelled
+}
+```
+
+### Variation Kind
+
+```typescript prisma/schema.prisma
+enum PatrimonialVariationKind {
+  INCREMENTO  // Asset value increased
+  DECREMENTO  // Asset value decreased
+  SIN_CAMBIO  // No significant change
+}
+```
+
+**Automatic Classification:**
+- `patrimonialDeltaUsd > 0` → INCREMENTO
+- `patrimonialDeltaUsd < 0` → DECREMENTO
+- `patrimonialDeltaUsd = 0` → SIN_CAMBIO
+
+## How Variations are Created
+
+Land patrimonial variations are generated through two primary mechanisms:
+
+### 1. Geospatial Operations
+
+When Level 4 geometries are split or merged via the [Geospatial Import](./geospatial-import) module:
+
+```typescript prisma/schema.prisma
+model GeoLandVariationJob {
+  id             String                    @id @default(uuid())
+  organizationId String
+  status         GeoVariationJobStatus     @default(PENDING)
+  operationType  GeoVariationOperationType // SPLIT or MERGE
+  variationDate  DateTime
+  notes          String?
+  payload        Json                      // Operation details
+  attempts       Int                       @default(0)
+  runAfter       DateTime                  @default(now())
+  completedAt    DateTime?
+  lastError      String?
+  createdById    String?
+}
+
+enum GeoVariationOperationType {
+  SPLIT  // One Level 4 → Multiple Level 4s
+  MERGE  // Multiple Level 4s → One Level 4
+}
+```
+
+**Workflow:**
+1. User uploads new Shapefile with modified Level 4 boundaries
+2. System detects geometry changes (split/merge)
+3. Creates `GeoLandVariationJob` for background processing
+4. Job generates `LandPatrimonialVariation` records with status `PENDIENTE`
+5. User reviews and processes variations
+
+### 2. Manual Land Use Updates
+
+<Note>
+  Currently, the API endpoint `/api/forest/land-accounting/variations` returns 405 (Method Not Allowed) for POST requests, indicating variations are primarily generated through geospatial operations rather than manual creation.
+</Note>
+
+```typescript src/app/api/forest/land-accounting/variations/route.ts
+export async function POST(req: NextRequest) {
+  void req;
+  return fail("Las variaciones se generan desde operaciones geoespaciales de Nivel 4.", 405);
+}
+```
+
+Future enhancement may support manual variation entry.
+
+## Querying Variations
+
+### API Endpoint
+
+**GET** `/api/forest/land-accounting/variations`
+
+**Query Parameters:**
+
+```typescript src/validations/land-accounting.schema.ts
+export const getPatrimonialVariationsQuerySchema = paginationSchema.extend({
+  status: z.enum(["PENDIENTE", "PROCESADA", "ANULADA"]).optional(),
+  level4Id: uuidSchema.optional(),
+  fromDate: z.coerce.date().optional(),
+  toDate: z.coerce.date().optional(),
+  search: z.string().max(255).optional(),
+});
+```
+
+**Example Request:**
+
+```
+GET /api/forest/land-accounting/variations?status=PENDIENTE&fromDate=2024-01-01&toDate=2024-12-31&page=1&limit=25
+```
+
+**Response:**
+
+```json
+{
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "level4": {
+        "id": "...",
+        "code": "RODAL-A1",
+        "name": "Rodal A1",
+        "level3": {
+          "id": "...",
+          "code": "COMP-A",
+          "name": "Compartimiento A",
+          "level2": {
+            "id": "...",
+            "code": "FINCA-001",
+            "name": "Finca San José"
+          }
+        }
+      },
+      "previousLandUseName": "BOSQUE",
+      "newLandUseName": "PLANTACION PINO",
+      "affectedAreaHa": "45.50",
+      "referenceValueBeforeUsd": "1200.00",
+      "referenceValueAfterUsd": "3500.00",
+      "totalValueBeforeUsd": "54600.00",
+      "totalValueAfterUsd": "159250.00",
+      "patrimonialDeltaUsd": "104650.00",
+      "kind": "INCREMENTO",
+      "status": "PENDIENTE",
+      "variationDate": "2024-03-15T00:00:00Z",
+      "notes": "Conversión a plantación comercial",
+      "createdBy": {
+        "id": "...",
+        "email": "usuario@ejemplo.com",
+        "firstName": "Juan",
+        "lastName": "Pérez"
+      },
+      "processedBy": null,
+      "processedAt": null,
+      "createdAt": "2024-03-15T10:30:00Z",
+      "updatedAt": "2024-03-15T10:30:00Z"
+    }
+  ],
+  "pagination": {
+    "total": 48,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 2
+  }
+}
+```
+
+### Filtering Logic
+
+The system only returns **actual land use changes**:
+
+```typescript src/app/api/forest/land-accounting/variations/route.ts
+function isModifiedLandUse(previousLandUseName: string | null, newLandUseName: string) {
+  const previous = normalizeText(previousLandUseName);
+  const next = normalizeText(newLandUseName);
+  // Includes new uses (no previous) and real changes
+  return next.length > 0 && previous !== next;
+}
+
+const modifiedItems = items.filter((item) =>
+  isModifiedLandUse(item.previousLandUseName, item.newLandUseName)
+);
+```
+
+This excludes:
+- Records where land use didn't actually change
+- Empty or invalid land use names
+- Variations created for geometric changes only (without land use impact)
+
+## Processing Variations
+
+### User Workflow
+
+<Steps>
+  <Step title="Review Pending Variations">
+    Navigate to Land Accounting → Variations and filter by status `PENDIENTE`
+  </Step>
+  <Step title="Verify Data">
+    Check:
+    - Land use change is accurate
+    - Affected area matches geometry
+    - Valuations are reasonable
+    - Notes explain the change
+  </Step>
+  <Step title="Process or Annul">
+    Choose action:
+    - **Process**: Approve the variation (updates Level 4 land use)
+    - **Annul**: Reject/cancel the variation
+  </Step>
+  <Step title="Add Comments">
+    Optionally provide reason for approval or rejection
+  </Step>
+</Steps>
+
+### API Endpoint
+
+**PATCH** `/api/forest/land-accounting/variations/[id]`
+
+```typescript src/validations/land-accounting.schema.ts
+export const updatePatrimonialVariationSchema = z
+  .object({
+    action: z.enum(["PROCESS", "ANNUL"]),
+    reason: z.string().max(2000).optional(),
+  })
+  .strict();
+```
+
+**Example: Processing a Variation**
+
+```json
+{
+  "action": "PROCESS",
+  "reason": "Variación aprobada tras verificar documentación legal"
+}
+```
+
+**Example: Annulling a Variation**
+
+```json
+{
+  "action": "ANNUL",
+  "reason": "Error en la importación geoespacial - geometría incorrecta"
+}
+```
+
+**Effects of Processing:**
+1. Status changes from `PENDIENTE` to `PROCESADA`
+2. `processedAt` timestamp set
+3. `processedById` records the user who processed it
+4. Level 4 unit's `currentLandUseName` updated to `newLandUseName`
+5. Level 4 unit's `landUseChangeDate` updated to `variationDate`
+6. Audit log entry created
+
+**Effects of Annulling:**
+1. Status changes to `ANULADA`
+2. No changes to Level 4 unit
+3. Variation preserved for audit trail
+
+## Valuation Calculations
+
+### Reference Values
+
+- **Reference Value Before** (`referenceValueBeforeUsd`): Value per hectare of previous land use
+- **Reference Value After** (`referenceValueAfterUsd`): Value per hectare of new land use
+
+### Total Values
+
+```
+totalValueBeforeUsd = referenceValueBeforeUsd × affectedAreaHa
+totalValueAfterUsd = referenceValueAfterUsd × affectedAreaHa
+```
+
+### Patrimonial Delta
+
+```
+patrimonialDeltaUsd = totalValueAfterUsd - totalValueBeforeUsd
+```
+
+**Examples:**
+
+| Scenario | Before ($/ha) | After ($/ha) | Area (ha) | Delta ($) | Kind |
+|----------|---------------|--------------|-----------|-----------|------|
+| Forest → Plantation | 1,200 | 3,500 | 45.5 | +104,650 | INCREMENTO |
+| Plantation → Harvested | 3,500 | 500 | 30.0 | -90,000 | DECREMENTO |
+| Pasture → Agroforestry | 800 | 800 | 20.0 | 0 | SIN_CAMBIO |
+
+<Note>
+  Valuation is typically set during geospatial import based on organization-specific land use type catalogs. Future enhancements may support automatic valuation from market data.
+</Note>
+
+## Land Use Types
+
+Organizations maintain catalogs of land use types with associated values:
+
+```typescript prisma/schema.prisma
+model LandUseType {
+  id             String        @id @default(uuid())
+  organizationId String?
+  continentId    String?       // Regional categorization
+  code           String
+  name           String
+  category       String        // "BOSQUE", "AGRICOLA", "OTRO"
+  surfaceHa      Decimal       @default(0)
+  isProductive   Boolean       @default(false)
+  isActive       Boolean       @default(true)
+  
+  organization   Organization?
+  continent      Continent?
+}
+```
+
+**Common Land Use Categories:**
+
+- **BOSQUE**: Natural forest, managed forest
+- **PLANTACION**: Commercial plantations
+- **AGRICOLA**: Cropland, pasture
+- **AGROFORESTAL**: Agroforestry systems
+- **OTRO_USO**: Infrastructure, water bodies, conservation
+
+## Geospatial Integration
+
+### Split Operation
+
+When one Level 4 unit is divided into multiple units:
+
+```json
+{
+  "operationType": "SPLIT",
+  "payload": {
+    "originalLevel4Id": "...",
+    "originalArea": 100.0,
+    "newLevel4s": [
+      {
+        "code": "RODAL-A1-1",
+        "area": 45.5,
+        "landUse": "PLANTACION PINO"
+      },
+      {
+        "code": "RODAL-A1-2",
+        "area": 54.5,
+        "landUse": "BOSQUE NATURAL"
+      }
+    ]
+  }
+}
+```
+
+Generates variations for each new unit with land use changes.
+
+### Merge Operation
+
+When multiple Level 4 units are combined:
+
+```json
+{
+  "operationType": "MERGE",
+  "payload": {
+    "sourceLevel4Ids": ["...", "..."],
+    "targetLevel4Id": "...",
+    "newArea": 150.0,
+    "newLandUse": "PLANTACION MIXTA"
+  }
+}
+```
+
+Generates a single variation for the merged unit.
+
+### Background Processing
+
+Geospatial variation jobs run asynchronously:
+
+```typescript prisma/schema.prisma
+enum GeoVariationJobStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+```
+
+**Job Workflow:**
+1. Job created with status `PENDING`
+2. Background worker picks up job
+3. Status changes to `PROCESSING`
+4. Variations generated and Level 4 units updated
+5. Status changes to `COMPLETED` (or `FAILED` on error)
+6. Errors logged in `lastError` field for troubleshooting
+
+## Organization Scoping
+
+All variations are automatically scoped to the user's organization:
+
+```typescript src/app/api/forest/land-accounting/variations/route.ts
+const where: Prisma.LandPatrimonialVariationWhereInput = {
+  ...(!isSuperAdmin ? { organizationId: organizationId ?? "" } : {}),
+  level4: {
+    isActive: true, // Only active Level 4 units
+  },
+};
+```
+
+## Reporting & Analytics
+
+### Key Metrics
+
+- **Total Patrimonial Impact**: Sum of all `patrimonialDeltaUsd` for processed variations
+- **Area Transitioned**: Total `affectedAreaHa` by land use type
+- **Pending Approval Count**: Variations with status `PENDIENTE`
+- **Land Use Distribution**: Current breakdown across organization
+
+### Date Range Analysis
+
+```
+GET /api/forest/land-accounting/variations?fromDate=2024-01-01&toDate=2024-12-31&status=PROCESADA
+```
+
+Analyze land use changes over time:
+- Quarterly reports for board meetings
+- Annual reports for regulatory compliance
+- Multi-year trends for strategic planning
+
+### Export for Accounting
+
+Variations can be exported to:
+- CSV/Excel for financial systems
+- GIS formats for spatial analysis
+- PDF reports for stakeholder communication
+
+## Audit Trail
+
+All variation operations are logged:
+
+```typescript
+await prisma.auditLog.create({
+  data: {
+    userId: authResult.session.user.id,
+    action: "UPDATE",
+    entityType: "LandPatrimonialVariation",
+    entityId: variation.id,
+    oldValues: { status: "PENDIENTE" },
+    newValues: { status: "PROCESADA", processedAt: new Date() },
+  },
+});
+```
+
+## Best Practices
+
+<AccordionGroup>
+  <Accordion title="Valuation Standards">
+    - Use consistent valuation methods across the organization
+    - Document valuation sources and dates
+    - Review and update reference values annually
+    - Consider market conditions and regional differences
+  </Accordion>
+  
+  <Accordion title="Approval Workflow">
+    - Require manager approval for variations > threshold
+    - Process pending variations monthly
+    - Document reasons for annulments
+    - Regular audits of processed variations
+  </Accordion>
+  
+  <Accordion title="Data Quality">
+    - Verify areas match geospatial data
+    - Validate land use names against catalog
+    - Check for duplicate variations
+    - Ensure variation dates are chronological
+  </Accordion>
+  
+  <Accordion title="Integration">
+    - Sync with financial accounting systems
+    - Export for regulatory reports
+    - Link to management plans
+    - Archive historical data
+  </Accordion>
+</AccordionGroup>
+
+<Warning>
+  **Important Considerations**
+  - Processing variations is irreversible (cannot un-process)
+  - Annulled variations remain in the database for audit purposes
+  - Land use changes affect biological asset classifications
+  - Large variations may require board approval
+</Warning>
+
+<Tip>
+  **Workflow Tips**
+  - Set up email notifications for pending variations
+  - Create dashboards showing variation trends
+  - Schedule regular review meetings
+  - Document valuation methodology in organization settings
+  - Use variation notes field extensively for context
+</Tip>
+
+## Related Documentation
+
+- [Forest Patrimony](./forest-patrimony) - Understanding Level 4 management units
+- [Geospatial Import](./geospatial-import) - How variations are generated from geometry changes
+- [Land Use Configuration](/api/config/forest-config) - Land use types and configuration

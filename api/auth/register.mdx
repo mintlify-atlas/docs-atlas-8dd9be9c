@@ -1,0 +1,232 @@
+---
+title: 'Register'
+api: 'POST /api/auth/register'
+description: 'Create a new user account'
+---
+
+## Authentication
+
+This endpoint does not require authentication.
+
+## Request Body
+
+<ParamField body="email" type="string" required>
+  User's email address. Must be a valid email format and unique.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  User's password. Must meet the following requirements:
+  - Minimum 8 characters
+  - At least one uppercase letter
+  - At least one lowercase letter
+  - At least one number
+</ParamField>
+
+<ParamField body="confirmPassword" type="string" required>
+  Password confirmation. Must match the `password` field exactly.
+</ParamField>
+
+<ParamField body="firstName" type="string" required>
+  User's first name. Minimum 2 characters.
+</ParamField>
+
+<ParamField body="lastName" type="string" required>
+  User's last name. Minimum 2 characters.
+</ParamField>
+
+## Response
+
+### Success Response (201 Created)
+
+<ResponseField name="success" type="boolean">
+  Always `true` for successful requests.
+</ResponseField>
+
+<ResponseField name="data" type="object">
+  Response data object.
+  
+  <ResponseField name="message" type="string">
+    Success message. Returns: "Cuenta creada. Pendiente de aprobacion por un ADMIN."
+  </ResponseField>
+</ResponseField>
+
+### Error Response
+
+<ResponseField name="success" type="boolean">
+  Always `false` for error responses.
+</ResponseField>
+
+<ResponseField name="error" type="string">
+  Error message describing what went wrong.
+</ResponseField>
+
+<ResponseField name="details" type="object">
+  Additional error details, such as validation errors.
+</ResponseField>
+
+## Error Responses
+
+| Status Code | Error Message | Description |
+|------------|---------------|-------------|
+| 400 | Datos inválidos | Request body validation failed. Check `details` for specific field errors. |
+| 409 | El email ya existe | An account with this email address already exists. |
+
+### Validation Error Details
+
+When status is 400, the `details` object contains field-specific validation errors:
+
+```json
+{
+  "success": false,
+  "error": "Datos inválidos",
+  "details": {
+    "fieldErrors": {
+      "password": ["Debe contener al menos una mayúscula"],
+      "confirmPassword": ["Las contraseñas no coinciden"]
+    }
+  }
+}
+```
+
+## Registration Flow
+
+1. Input validation using Zod schema
+2. Check if email already exists
+3. Create or get default organization ("Por defecto")
+4. Assign USER role with default permissions
+5. Hash password using bcrypt
+6. Create user with status `PENDING_VERIFICATION`
+7. Create audit log entry
+8. Return success message
+
+## Important Notes
+
+- New users are created with status `PENDING_VERIFICATION`
+- Users cannot log in until an admin changes their status to `ACTIVE`
+- All new users are assigned to a default organization
+- Users are automatically assigned the USER role
+- Registration activity is logged in the audit log
+
+## Code Examples
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST https://your-domain.com/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "newuser@example.com",
+    "password": "SecurePass123",
+    "confirmPassword": "SecurePass123",
+    "firstName": "John",
+    "lastName": "Doe"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('/api/auth/register', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    email: 'newuser@example.com',
+    password: 'SecurePass123',
+    confirmPassword: 'SecurePass123',
+    firstName: 'John',
+    lastName: 'Doe'
+  })
+});
+
+const result = await response.json();
+
+if (result.success) {
+  console.log(result.data.message);
+} else {
+  console.error(result.error, result.details);
+}
+```
+
+```python Python
+import requests
+
+url = "https://your-domain.com/api/auth/register"
+payload = {
+    "email": "newuser@example.com",
+    "password": "SecurePass123",
+    "confirmPassword": "SecurePass123",
+    "firstName": "John",
+    "lastName": "Doe"
+}
+
+response = requests.post(url, json=payload)
+result = response.json()
+
+if result.get('success'):
+    print(result['data']['message'])
+else:
+    print(f"Error: {result.get('error')}")
+    print(f"Details: {result.get('details')}")
+```
+
+```typescript TypeScript
+interface RegisterRequest {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+}
+
+interface RegisterResponse {
+  success: boolean;
+  data?: {
+    message: string;
+  };
+  error?: string;
+  details?: any;
+}
+
+const registerUser = async (data: RegisterRequest): Promise<RegisterResponse> => {
+  const response = await fetch('/api/auth/register', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  return response.json();
+};
+
+// Usage
+const result = await registerUser({
+  email: 'newuser@example.com',
+  password: 'SecurePass123',
+  confirmPassword: 'SecurePass123',
+  firstName: 'John',
+  lastName: 'Doe'
+});
+```
+
+</CodeGroup>
+
+## Password Requirements
+
+Passwords must meet the following criteria (enforced by `passwordSchema`):
+
+- **Minimum length**: 8 characters
+- **Uppercase**: At least one uppercase letter (A-Z)
+- **Lowercase**: At least one lowercase letter (a-z)
+- **Number**: At least one digit (0-9)
+
+Example valid passwords:
+- `SecurePass123`
+- `MyP@ssw0rd`
+- `Welcome2024`
+
+Example invalid passwords:
+- `password` (no uppercase, no number)
+- `PASSWORD123` (no lowercase)
+- `Pass123` (too short)
+- `SecurePass` (no number)

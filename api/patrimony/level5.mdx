@@ -1,0 +1,368 @@
+---
+title: 'Level 5 - Reference Units'
+api: 'GET /api/forest/patrimony'
+---
+
+## Overview
+
+Level 5 represents reference units, sub-parcels, or sample plots within Level 4 stands. These are the smallest spatial units in the hierarchy, used for detailed measurements and monitoring.
+
+## Hierarchy
+
+```
+Level 2 (FINCA, PREDIO, etc.)
+  └─ Level 3 (Compartments, Blocks, Sections)
+      └─ Level 4 (Stands, Parcels, Management Units)
+          └─ Level 5 (REFERENCIA, SUBUNIDAD, etc.) ← You are here
+```
+
+**Parent Relationship:** Each Level 5 unit must belong to a Level 4 unit via `level4Id`.
+
+## List Level 5 Units
+
+<ParamField query="level" type="string" required>
+  Must be set to `"5"` to retrieve Level 5 units
+</ParamField>
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination
+</ParamField>
+
+<ParamField query="limit" type="number" default="25">
+  Number of items per page
+</ParamField>
+
+<ParamField query="parentId" type="string">
+  Filter by Level 4 parent ID (UUID)
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search by code or name (case-insensitive)
+</ParamField>
+
+### Response
+
+<ResponseField name="items" type="array">
+  <ResponseField name="id" type="string">
+    Unique identifier (UUID)
+  </ResponseField>
+
+  <ResponseField name="level4Id" type="string">
+    Parent Level 4 unit ID (UUID)
+  </ResponseField>
+
+  <ResponseField name="code" type="string">
+    Unique code for the unit (max 80 characters, unique within parent)
+  </ResponseField>
+
+  <ResponseField name="name" type="string">
+    Name of the reference unit or sub-parcel
+  </ResponseField>
+
+  <ResponseField name="type" type="enum">
+    Type of reference unit. Possible values:
+    - `REFERENCIA` - Reference
+    - `SUBUNIDAD` - Sub-unit
+    - `SUBPARCELA` - Sub-parcel
+    - `MUESTRA` - Sample
+    - `SUBMUESTRA` - Sub-sample
+  </ResponseField>
+
+  <ResponseField name="shapeType" type="enum" required>
+    Shape of the plot. Possible values:
+    - `RECTANGULAR` - Rectangular
+    - `CUADRADA` - Square
+    - `CIRCULAR` - Circular
+    - `HEXAGONAL` - Hexagonal
+  </ResponseField>
+
+  <ResponseField name="dimension1M" type="number">
+    First dimension in meters (non-negative)
+  </ResponseField>
+
+  <ResponseField name="dimension2M" type="number">
+    Second dimension in meters (non-negative)
+  </ResponseField>
+
+  <ResponseField name="dimension3M" type="number">
+    Third dimension in meters (non-negative, for complex shapes)
+  </ResponseField>
+
+  <ResponseField name="dimension4M" type="number">
+    Fourth dimension in meters (non-negative, for complex shapes)
+  </ResponseField>
+
+  <ResponseField name="areaM2" type="number">
+    Calculated area in square meters (automatically computed from dimensions)
+  </ResponseField>
+
+  <ResponseField name="centroidLatitude" type="number">
+    Latitude of centroid (-90 to 90)
+  </ResponseField>
+
+  <ResponseField name="centroidLongitude" type="number">
+    Longitude of centroid (-180 to 180)
+  </ResponseField>
+
+  <ResponseField name="lastInfoDate" type="date">
+    Date of last information update
+  </ResponseField>
+
+  <ResponseField name="isActive" type="boolean" default="true">
+    Whether the unit is active
+  </ResponseField>
+
+  <ResponseField name="createdAt" type="datetime">
+    Creation timestamp
+  </ResponseField>
+
+  <ResponseField name="updatedAt" type="datetime">
+    Last update timestamp
+  </ResponseField>
+
+  <ResponseField name="level4" type="object">
+    Parent Level 4 unit information
+    <ResponseField name="id" type="string">
+      Level 4 ID
+    </ResponseField>
+    <ResponseField name="code" type="string">
+      Level 4 code
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Level 4 name
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  <ResponseField name="total" type="number">
+    Total number of items
+  </ResponseField>
+
+  <ResponseField name="page" type="number">
+    Current page number
+  </ResponseField>
+
+  <ResponseField name="limit" type="number">
+    Items per page
+  </ResponseField>
+
+  <ResponseField name="totalPages" type="number">
+    Total number of pages
+  </ResponseField>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET "https://api.confor.app/api/forest/patrimony?level=5&parentId=770e8400-e29b-41d4-a716-446655440002" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```javascript JavaScript
+const response = await fetch(
+  'https://api.confor.app/api/forest/patrimony?level=5&parentId=770e8400-e29b-41d4-a716-446655440002',
+  {
+    headers: {
+      'Authorization': 'Bearer YOUR_TOKEN'
+    }
+  }
+);
+const data = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "items": [
+    {
+      "id": "880e8400-e29b-41d4-a716-446655440003",
+      "level4Id": "770e8400-e29b-41d4-a716-446655440002",
+      "code": "SUBP-001",
+      "name": "Subparcela de Muestreo 1",
+      "type": "SUBPARCELA",
+      "shapeType": "CUADRADA",
+      "dimension1M": 20,
+      "dimension2M": 20,
+      "dimension3M": null,
+      "dimension4M": null,
+      "areaM2": 400,
+      "centroidLatitude": 10.5251,
+      "centroidLongitude": -66.8745,
+      "lastInfoDate": "2024-01-12T00:00:00Z",
+      "isActive": true,
+      "createdAt": "2024-01-15T10:45:00Z",
+      "updatedAt": "2024-01-15T10:45:00Z",
+      "level4": {
+        "id": "770e8400-e29b-41d4-a716-446655440002",
+        "code": "RODAL-01",
+        "name": "Rodal Pino Caribe"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 1,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 1
+  }
+}
+```
+</ResponseExample>
+
+---
+
+## Create Level 5 Unit
+
+<api>POST /api/forest/patrimony</api>
+
+When creating a Level 5 unit, the area is automatically calculated based on the shape type and dimensions provided.
+
+### Request Body
+
+<ParamField body="level" type="string" required>
+  Must be set to `"5"` to create a Level 5 unit
+</ParamField>
+
+<ParamField body="data" type="object" required>
+  <ParamField body="level4Id" type="string" required>
+    Parent Level 4 unit ID (UUID)
+  </ParamField>
+
+  <ParamField body="code" type="string" required>
+    Unique code within parent (1-80 characters)
+  </ParamField>
+
+  <ParamField body="name" type="string" required>
+    Name of the reference unit (2-255 characters)
+  </ParamField>
+
+  <ParamField body="type" type="enum" required>
+    Type: `REFERENCIA`, `SUBUNIDAD`, `SUBPARCELA`, `MUESTRA`, `SUBMUESTRA`
+  </ParamField>
+
+  <ParamField body="shapeType" type="enum" required>
+    Shape: `RECTANGULAR`, `CUADRADA`, `CIRCULAR`, `HEXAGONAL`
+  </ParamField>
+
+  <ParamField body="dimension1M" type="number">
+    First dimension in meters (must be non-negative)
+  </ParamField>
+
+  <ParamField body="dimension2M" type="number">
+    Second dimension in meters (must be non-negative)
+  </ParamField>
+
+  <ParamField body="dimension3M" type="number">
+    Third dimension in meters (must be non-negative)
+  </ParamField>
+
+  <ParamField body="dimension4M" type="number">
+    Fourth dimension in meters (must be non-negative)
+  </ParamField>
+
+  <ParamField body="centroidLatitude" type="number">
+    Latitude of centroid (-90 to 90)
+  </ParamField>
+
+  <ParamField body="centroidLongitude" type="number">
+    Longitude of centroid (-180 to 180)
+  </ParamField>
+
+  <ParamField body="lastInfoDate" type="date">
+    Date of last information update
+  </ParamField>
+
+  <ParamField body="isActive" type="boolean" default="true">
+    Whether the unit is active
+  </ParamField>
+</ParamField>
+
+### Area Calculation
+
+The area is automatically calculated based on shape type:
+
+- **CUADRADA (Square)**: `dimension1M²`
+- **RECTANGULAR**: `dimension1M × dimension2M`
+- **CIRCULAR**: `π × (dimension1M/2)²` (dimension1M is diameter)
+- **HEXAGONAL**: Complex formula based on dimensions
+
+If the dimensions are insufficient for the shape type, the request will fail with error code 400.
+
+### Response
+
+Returns the created Level 5 unit with status code 201, including the calculated area and parent Level 4 information.
+
+<RequestExample>
+```bash cURL
+curl -X POST "https://api.confor.app/api/forest/patrimony" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "level": "5",
+    "data": {
+      "level4Id": "770e8400-e29b-41d4-a716-446655440002",
+      "code": "SUBP-001",
+      "name": "Subparcela de Muestreo 1",
+      "type": "SUBPARCELA",
+      "shapeType": "CUADRADA",
+      "dimension1M": 20,
+      "centroidLatitude": 10.5251,
+      "centroidLongitude": -66.8745
+    }
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('https://api.confor.app/api/forest/patrimony', {
+  method: 'POST',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN',
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    level: '5',
+    data: {
+      level4Id: '770e8400-e29b-41d4-a716-446655440002',
+      code: 'SUBP-001',
+      name: 'Subparcela de Muestreo 1',
+      type: 'SUBPARCELA',
+      shapeType: 'CUADRADA',
+      dimension1M: 20,
+      centroidLatitude: 10.5251,
+      centroidLongitude: -66.8745
+    }
+  })
+});
+const data = await response.json();
+```
+</RequestExample>
+
+<ResponseExample>
+```json
+{
+  "id": "880e8400-e29b-41d4-a716-446655440003",
+  "level4Id": "770e8400-e29b-41d4-a716-446655440002",
+  "code": "SUBP-001",
+  "name": "Subparcela de Muestreo 1",
+  "type": "SUBPARCELA",
+  "shapeType": "CUADRADA",
+  "dimension1M": 20,
+  "dimension2M": null,
+  "dimension3M": null,
+  "dimension4M": null,
+  "areaM2": 400,
+  "centroidLatitude": 10.5251,
+  "centroidLongitude": -66.8745,
+  "lastInfoDate": null,
+  "isActive": true,
+  "createdAt": "2024-01-15T10:45:00Z",
+  "updatedAt": "2024-01-15T10:45:00Z",
+  "level4": {
+    "id": "770e8400-e29b-41d4-a716-446655440002",
+    "code": "RODAL-01",
+    "name": "Rodal Pino Caribe"
+  }
+}
+```
+</ResponseExample>

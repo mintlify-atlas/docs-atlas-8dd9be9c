@@ -1,0 +1,278 @@
+---
+title: 'Create Biological Asset'
+description: 'Create a new biological asset record'
+api: 'POST /api/forest/biological-assets'
+---
+
+Creates a new biological asset (Level 6) record associated with a Level 4 patrimony unit. This endpoint allows you to register detailed information about forest biological assets including planting details, inventory data, measurements, and costs.
+
+## Authentication
+
+Requires authentication with valid session token. Users must have `forest-biological-asset` CREATE permission. SUPER_ADMIN role has full access.
+
+## Request Body
+
+<ParamField body="level4Id" type="string" required>
+  ID of the Level 4 patrimony unit (UUID format). Must exist and belong to the user's organization.
+</ParamField>
+
+<ParamField body="biologicalAssetKey" type="string" required>
+  Unique biological asset identifier (1-220 characters). Must be unique across all biological assets.
+</ParamField>
+
+<ParamField body="accountingKey" type="string">
+  Accounting key for financial tracking (max 220 characters)
+</ParamField>
+
+<ParamField body="establishmentDate" type="date">
+  Date when the biological asset was established. Accepts ISO 8601 date format or YYYY-MM-DD.
+</ParamField>
+
+<ParamField body="plantingYear" type="number">
+  Year of planting (integer)
+</ParamField>
+
+<ParamField body="geneticMaterialCode" type="string">
+  Code identifying the genetic material (max 80 characters)
+</ParamField>
+
+<ParamField body="geneticMaterialName" type="string">
+  Name of the genetic material or species (max 255 characters)
+</ParamField>
+
+<ParamField body="assetType" type="string" default="COMERCIAL">
+  Type of biological asset. Options: `COMERCIAL`, `INVESTIGACION`
+</ParamField>
+
+<ParamField body="managementSchemeCode" type="string">
+  Code for the management scheme (max 80 characters)
+</ParamField>
+
+<ParamField body="managementSchemeName" type="string">
+  Name of the management scheme (max 255 characters)
+</ParamField>
+
+<ParamField body="inventoryCode" type="string">
+  Unique inventory code (max 80 characters)
+</ParamField>
+
+<ParamField body="inventoryType" type="string">
+  Type of inventory conducted (max 120 characters)
+</ParamField>
+
+<ParamField body="inventoryDate" type="date">
+  Date when inventory was conducted
+</ParamField>
+
+<ParamField body="inventoryAgeYears" type="number">
+  Age of the asset at inventory time in years (integer)
+</ParamField>
+
+<ParamField body="level5UnitCount" type="number">
+  Number of Level 5 units associated (integer)
+</ParamField>
+
+<ParamField body="spacingCode" type="string">
+  Code for spacing configuration (max 80 characters)
+</ParamField>
+
+<ParamField body="spacingDescription" type="string">
+  Description of spacing pattern (max 255 characters)
+</ParamField>
+
+<ParamField body="spacingBetweenRowsM" type="number">
+  Distance between rows in meters (decimal)
+</ParamField>
+
+<ParamField body="spacingBetweenTreesM" type="number">
+  Distance between trees in meters (decimal)
+</ParamField>
+
+<ParamField body="treeDensityPerHa" type="number">
+  Number of trees per hectare (decimal)
+</ParamField>
+
+<ParamField body="survivalRate" type="number">
+  Survival rate as percentage (decimal, 0-100)
+</ParamField>
+
+<ParamField body="dominantHeightM" type="number">
+  Dominant height in meters (decimal)
+</ParamField>
+
+<ParamField body="meanHeightM" type="number">
+  Mean height in meters (decimal)
+</ParamField>
+
+<ParamField body="quadraticDiameterM" type="number">
+  Quadratic mean diameter in meters (decimal)
+</ParamField>
+
+<ParamField body="basalAreaM2" type="number">
+  Basal area in square meters (decimal)
+</ParamField>
+
+<ParamField body="unitVolumeM3NoBarkPerHa" type="number">
+  Volume without bark per hectare in cubic meters (decimal)
+</ParamField>
+
+<ParamField body="unitVolumeM3WithBarkPerHa" type="number">
+  Volume with bark per hectare in cubic meters (decimal)
+</ParamField>
+
+<ParamField body="totalVolumeM3NoBark" type="number">
+  Total volume without bark in cubic meters (decimal)
+</ParamField>
+
+<ParamField body="totalVolumeM3WithBark" type="number">
+  Total volume with bark in cubic meters (decimal)
+</ParamField>
+
+<ParamField body="adjustedVolumeM3NoBarkPerHa" type="number">
+  Adjusted volume without bark per hectare in cubic meters (decimal)
+</ParamField>
+
+<ParamField body="adjustedVolumeM3WithBarkPerHa" type="number">
+  Adjusted volume with bark per hectare in cubic meters (decimal)
+</ParamField>
+
+<ParamField body="imaClassCode" type="string">
+  IMA (Mean Annual Increment) classification code (max 80 characters)
+</ParamField>
+
+<ParamField body="imaClassName" type="string">
+  IMA classification name (max 120 characters)
+</ParamField>
+
+<ParamField body="actualCostUsd" type="number">
+  Actual cost in USD (decimal with up to 2 decimal places)
+</ParamField>
+
+<ParamField body="isActive" type="boolean" default="true">
+  Whether the asset is active
+</ParamField>
+
+## Response
+
+Returns the created biological asset object with all fields, including the generated `id` and timestamps. Status code: **201 Created**
+
+<ResponseField name="id" type="string">
+  Newly created unique identifier (UUID)
+</ResponseField>
+
+<ResponseField name="level4" type="object">
+  Associated Level 4 patrimony unit details
+  <Expandable title="Level 4 Details">
+    <ResponseField name="id" type="string">
+      Level 4 unit ID
+    </ResponseField>
+    <ResponseField name="code" type="string">
+      Level 4 unit code
+    </ResponseField>
+    <ResponseField name="name" type="string">
+      Level 4 unit name
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="createdAt" type="datetime">
+  Creation timestamp
+</ResponseField>
+
+<ResponseField name="updatedAt" type="datetime">
+  Last update timestamp
+</ResponseField>
+
+*All other fields from the request body are returned in the response.*
+
+## Error Responses
+
+- **400**: Invalid data or validation errors
+  - Duplicate biological asset key
+  - Missing required fields
+  - Invalid foreign key relationships
+- **401**: Unauthorized (not authenticated)
+- **403**: Forbidden (user lacks CREATE permission or organization)
+- **404**: Level 4 unit not found or not accessible
+- **409**: Biological asset key already exists
+- **500**: Server error
+
+## Example Request
+
+```bash
+curl -X POST "https://api.example.com/api/forest/biological-assets" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "level4Id": "123e4567-e89b-12d3-a456-426614174000",
+    "biologicalAssetKey": "BA-PINE-002",
+    "accountingKey": "ACC-002",
+    "establishmentDate": "2021-04-20",
+    "plantingYear": 2021,
+    "geneticMaterialCode": "GM-002",
+    "geneticMaterialName": "Pinus oocarpa",
+    "assetType": "COMERCIAL",
+    "treeDensityPerHa": 1250,
+    "survivalRate": 98.0,
+    "actualCostUsd": 18500.00,
+    "isActive": true
+  }'
+```
+
+## Example Response
+
+```json
+{
+  "id": "a8b7c9d0-1234-5678-9abc-def012345678",
+  "level4Id": "123e4567-e89b-12d3-a456-426614174000",
+  "biologicalAssetKey": "BA-PINE-002",
+  "accountingKey": "ACC-002",
+  "establishmentDate": "2021-04-20T00:00:00Z",
+  "plantingYear": 2021,
+  "geneticMaterialCode": "GM-002",
+  "geneticMaterialName": "Pinus oocarpa",
+  "assetType": "COMERCIAL",
+  "managementSchemeCode": null,
+  "managementSchemeName": null,
+  "inventoryCode": null,
+  "inventoryType": null,
+  "inventoryDate": null,
+  "inventoryAgeYears": null,
+  "level5UnitCount": null,
+  "spacingCode": null,
+  "spacingDescription": null,
+  "spacingBetweenRowsM": null,
+  "spacingBetweenTreesM": null,
+  "treeDensityPerHa": "1250",
+  "survivalRate": "98.00",
+  "dominantHeightM": null,
+  "meanHeightM": null,
+  "quadraticDiameterM": null,
+  "basalAreaM2": null,
+  "unitVolumeM3NoBarkPerHa": null,
+  "unitVolumeM3WithBarkPerHa": null,
+  "totalVolumeM3NoBark": null,
+  "totalVolumeM3WithBark": null,
+  "adjustedVolumeM3NoBarkPerHa": null,
+  "adjustedVolumeM3WithBarkPerHa": null,
+  "imaClassCode": null,
+  "imaClassName": null,
+  "actualCostUsd": "18500.00",
+  "isActive": true,
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z",
+  "level4": {
+    "id": "123e4567-e89b-12d3-a456-426614174000",
+    "code": "L4-001",
+    "name": "Rodal Norte"
+  }
+}
+```
+
+## Audit Log
+
+This operation creates an audit log entry with:
+- **Action**: CREATE
+- **Entity Type**: ForestBiologicalAssetLevel6
+- **Entity ID**: The new biological asset ID
+- **New Values**: All submitted data

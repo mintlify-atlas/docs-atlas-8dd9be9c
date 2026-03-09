@@ -1,0 +1,779 @@
+---
+title: Worker Setup
+description: Configure and deploy the geospatial processing worker for shapefile imports and surface calculations
+---
+
+## Overview
+
+The CONFOR geospatial worker is a background process that handles:
+
+- **Shapefile imports**: Processing uploaded ZIP files containing Level 4 geometry
+- **Surface recalculations**: Updating surface areas for Level 2 and Level 3 units
+- **Geometry variations**: Tracking changes in polygon geometries over time
+
+The worker runs independently of the web application and can be scaled horizontally.
+
+## Architecture
+
+```mermaid
+graph LR
+    A[Web App] -->|Creates Jobs| B[(PostgreSQL)]
+    C[Geo Worker] -->|Polls Jobs| B
+    C -->|Processes| D[Shapefile Parser]
+    D -->|Validates| E[PostGIS]
+    E -->|Saves| B
+    C -->|Updates Status| B
+```
+
+<Info>
+The worker uses a **polling architecture** with configurable intervals and batch sizes. Multiple worker instances can run simultaneously for load distribution.
+</Info>
+
+## Quick Start
+
+### Development Mode
+
+<CodeGroup>
+
+```bash Continuous Worker
+# Start the worker (runs until stopped)
+pnpm worker:geo
+
+# Or with npm
+npm run worker:geo
+
+# Worker output:
+[2026-03-09T14:30:00.123Z] [geo-worker] started (interval=4000ms, importBatch=5, recalcBatch=10, variationBatch=15, runOnce=false)
+[2026-03-09T14:30:05.456Z] [geo-worker] processed import_jobs=2 recalc_jobs=1 variation_jobs=0
+```
+
+```bash Single Cycle (Testing)
+# Run one cycle and exit
+pnpm worker:geo:once
+
+# Or with environment variable
+GEO_WORKER_RUN_ONCE=true pnpm worker:geo
+
+# Useful for:
+# - Testing worker functionality
+# - Manual job processing
+# - CI/CD integration tests
+```
+
+```bash Custom Configuration
+# Override batch sizes and interval
+GEO_WORKER_INTERVAL_MS=2000 \
+GEO_IMPORT_BATCH_SIZE=10 \
+GEO_RECALC_BATCH_SIZE=20 \
+GEO_VARIATION_BATCH_SIZE=30 \
+pnpm worker:geo
+```
+
+</CodeGroup>
+
+## Production Deployment
+
+### Using PM2 (Recommended)
+
+PM2 provides process management, automatic restarts, and monitoring.
+
+#### 1. Install PM2
+
+```bash
+npm install -g pm2
+```
+
+#### 2. Configure Ecosystem File
+
+The project includes `ecosystem.config.cjs` with optimized settings:
+
+```javascript ecosystem.config.cjs
+module.exports = {
+  apps: [
+    {
+      name: "confor-web",
+      cwd: ".",
+      script: "cmd",
+      args: "/c pnpm start",
+      env: {
+        NODE_ENV: "production",
+      },
+      autorestart: true,
+      max_restarts: 10,
+      restart_delay: 3000,
+    },
+    {
+      name: "confor-geo-worker",
+      cwd: ".",
+      script: "cmd",
+      args: "/c pnpm worker:geo",
+      env: {
+        NODE_ENV: "production",
+        GEO_WORKER_INTERVAL_MS: "5000",
+        GEO_IMPORT_BATCH_SIZE: "500",
+        GEO_RECALC_BATCH_SIZE: "200",
+        GEO_VARIATION_BATCH_SIZE: "300",
+      },
+      autorestart: true,
+      max_restarts: 20,
+      restart_delay: 3000,
+    },
+  ],
+};
+```
+
+<Note>
+Batch sizes in production (500/200/300) are significantly higher than development defaults (5/10/15) for optimal throughput.
+</Note>
+
+#### 3. Build and Start
+
+<CodeGroup>
+
+```bash Initial Setup
+# Build the application
+pnpm build
+
+# Start all processes
+pm2 start ecosystem.config.cjs
+
+# Expected output:
+┌─────┬──────────────────────┬─────────┬─────────┬───────────┐
+│ id  │ name                 │ mode    │ status  │ cpu       │
+├─────┼──────────────────────┼─────────┼─────────┼───────────┤
+│ 0   │ confor-web           │ fork    │ online  │ 0%        │
+│ 1   │ confor-geo-worker    │ fork    │ online  │ 0%        │
+└─────┴──────────────────────┴─────────┴─────────┴───────────┘
+```
+
+```bash Process Management
+# View process status
+pm2 status
+
+# View real-time logs
+pm2 logs
+
+# View logs for specific process
+pm2 logs confor-geo-worker
+
+# Restart worker
+pm2 restart confor-geo-worker
+
+# Restart web app
+pm2 restart confor-web
+
+# Stop all processes
+pm2 stop all
+
+# Delete all processes
+pm2 delete all
+```
+
+```bash Monitoring
+# View detailed metrics
+pm2 monit
+
+# Get process info
+pm2 show confor-geo-worker
+
+# View error logs only
+pm2 logs confor-geo-worker --err
+
+# Export logs to file
+pm2 logs confor-geo-worker --out > worker.log
+```
+
+</CodeGroup>
+
+#### 4. Persist Configuration
+
+```bash
+# Save current process list
+pm2 save
+
+# Setup startup script (Windows)
+pm2 startup
+
+# Follow the instructions shown by PM2
+# Then save again
+pm2 save
+```
+
+<Warning>
+On Windows, PM2 startup requires administrator privileges. Run the command PM2 displays in an elevated command prompt.
+</Warning>
+
+### Using Docker
+
+Create a dedicated worker container:
+
+<CodeGroup>
+
+```dockerfile Dockerfile.worker
+FROM node:20-alpine
+
+# Install dependencies for PostGIS/Turf.js native modules
+RUN apk add --no-cache \
+    postgresql-client \
+    python3 \
+    make \
+    g++
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json pnpm-lock.yaml ./
+
+# Install pnpm and dependencies
+RUN npm install -g pnpm
+RUN pnpm install --frozen-lockfile --prod
+
+# Copy application code
+COPY . .
+
+# Generate Prisma client
+RUN pnpm db:generate
+
+# Set environment
+ENV NODE_ENV=production
+
+CMD ["pnpm", "worker:geo"]
+```
+
+```yaml docker-compose.worker.yml
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: confor_prod
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redisdata:/data
+    ports:
+      - "6379:6379"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/confor_prod
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    depends_on:
+      - postgres
+      - redis
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/confor_prod
+      NODE_ENV: production
+      GEO_WORKER_INTERVAL_MS: 5000
+      GEO_IMPORT_BATCH_SIZE: 500
+      GEO_RECALC_BATCH_SIZE: 200
+      GEO_VARIATION_BATCH_SIZE: 300
+    depends_on:
+      - postgres
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
+```
+
+```bash Deploy with Docker
+# Build and start all services
+docker compose -f docker-compose.worker.yml up -d --build
+
+# View logs
+docker compose -f docker-compose.worker.yml logs -f worker
+
+# Scale workers horizontally
+docker compose -f docker-compose.worker.yml up -d --scale worker=3
+
+# Restart worker only
+docker compose -f docker-compose.worker.yml restart worker
+```
+
+</CodeGroup>
+
+### Using Systemd (Linux)
+
+Create a system service for the worker:
+
+```ini /etc/systemd/system/confor-worker.service
+[Unit]
+Description=CONFOR Geospatial Worker
+After=network.target postgresql.service
+
+[Service]
+Type=simple
+User=confor
+WorkingDirectory=/opt/confor
+Environment="NODE_ENV=production"
+Environment="DATABASE_URL=postgresql://user:pass@localhost:5432/confor"
+Environment="GEO_WORKER_INTERVAL_MS=5000"
+Environment="GEO_IMPORT_BATCH_SIZE=500"
+Environment="GEO_RECALC_BATCH_SIZE=200"
+ExecStart=/usr/bin/pnpm worker:geo
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/confor/worker.log
+StandardError=append:/var/log/confor/worker-error.log
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start the service:
+
+```bash
+# Reload systemd
+sudo systemctl daemon-reload
+
+# Enable service
+sudo systemctl enable confor-worker
+
+# Start service
+sudo systemctl start confor-worker
+
+# Check status
+sudo systemctl status confor-worker
+
+# View logs
+sudo journalctl -u confor-worker -f
+```
+
+## Configuration Reference
+
+### Environment Variables
+
+| Variable | Type | Default | Production | Description |
+|----------|------|---------|------------|-------------|
+| `GEO_WORKER_INTERVAL_MS` | number | `4000` | `5000` | Milliseconds between polling cycles |
+| `GEO_IMPORT_BATCH_SIZE` | number | `5` | `500` | Max import jobs processed per cycle |
+| `GEO_RECALC_BATCH_SIZE` | number | `10` | `200` | Max recalc jobs processed per cycle |
+| `GEO_VARIATION_BATCH_SIZE` | number | `15` | `300` | Max variation jobs processed per cycle |
+| `GEO_WORKER_RUN_ONCE` | boolean | `false` | `false` | Exit after one cycle (testing) |
+| `GEO_WORKER_SECRET` | string | - | Required | Secret for worker API endpoints |
+| `DATABASE_URL` | string | Required | Required | PostgreSQL connection string |
+| `NODE_ENV` | string | `development` | `production` | Runtime environment |
+
+### Batch Size Tuning
+
+Choose batch sizes based on your server capacity:
+
+<Tabs>
+  <Tab title="Light Load">
+    **Suitable for:** Small organizations, under 100 imports/day
+    
+    ```bash
+    GEO_WORKER_INTERVAL_MS=5000
+    GEO_IMPORT_BATCH_SIZE=10
+    GEO_RECALC_BATCH_SIZE=20
+    GEO_VARIATION_BATCH_SIZE=30
+    ```
+  </Tab>
+  
+  <Tab title="Medium Load">
+    **Suitable for:** Medium organizations, 100-500 imports/day
+    
+    ```bash
+    GEO_WORKER_INTERVAL_MS=5000
+    GEO_IMPORT_BATCH_SIZE=100
+    GEO_RECALC_BATCH_SIZE=50
+    GEO_VARIATION_BATCH_SIZE=100
+    ```
+  </Tab>
+  
+  <Tab title="Heavy Load">
+    **Suitable for:** Large organizations, over 500 imports/day
+    
+    ```bash
+    GEO_WORKER_INTERVAL_MS=3000
+    GEO_IMPORT_BATCH_SIZE=500
+    GEO_RECALC_BATCH_SIZE=200
+    GEO_VARIATION_BATCH_SIZE=300
+    ```
+    
+    Consider running multiple worker instances.
+  </Tab>
+</Tabs>
+
+## Worker Implementation
+
+The worker is implemented in `src/workers/geo-worker-scheduler.ts`:
+
+```typescript
+import "dotenv/config";
+import { prisma } from "@/lib/prisma";
+import { 
+  processNextGeoVariationJob, 
+  processNextPendingImportJob, 
+  processNextRecalcJob 
+} from "@/lib/geo-import-worker";
+
+const intervalMs = Number.parseInt(
+  process.env.GEO_WORKER_INTERVAL_MS ?? "4000", 10
+);
+const importBatchSize = Number.parseInt(
+  process.env.GEO_IMPORT_BATCH_SIZE ?? "5", 10
+);
+const recalcBatchSize = Number.parseInt(
+  process.env.GEO_RECALC_BATCH_SIZE ?? "10", 10
+);
+const variationBatchSize = Number.parseInt(
+  process.env.GEO_VARIATION_BATCH_SIZE ?? "15", 10
+);
+const runOnce = process.env.GEO_WORKER_RUN_ONCE === "true";
+
+async function runBatch() {
+  // Process import jobs
+  for (let i = 0; i < importBatchSize; i++) {
+    const result = await processNextPendingImportJob();
+    if (!result.processed) break;
+  }
+  
+  // Process recalculation jobs
+  for (let i = 0; i < recalcBatchSize; i++) {
+    const result = await processNextRecalcJob();
+    if (!result.processed) break;
+  }
+  
+  // Process variation jobs
+  for (let i = 0; i < variationBatchSize; i++) {
+    const result = await processNextGeoVariationJob();
+    if (!result.processed) break;
+  }
+}
+```
+
+### Job Processing Flow
+
+<Steps>
+  <Step title="Poll Database">
+    Worker queries for pending jobs in `PENDING` status
+  </Step>
+  
+  <Step title="Claim Job">
+    Update job status to `PROCESSING` with worker instance ID
+  </Step>
+  
+  <Step title="Process Job">
+    - Parse shapefile ZIP
+    - Validate geometry with PostGIS
+    - Transform to EPSG:4326
+    - Link to Level 2/3 hierarchy
+    - Calculate surface areas
+  </Step>
+  
+  <Step title="Update Status">
+    Mark job as `COMPLETED` or `FAILED` with error details
+  </Step>
+  
+  <Step title="Repeat">
+    Continue to next job in batch
+  </Step>
+</Steps>
+
+## Monitoring and Observability
+
+### Log Format
+
+The worker outputs structured JSON logs:
+
+```json
+{
+  "timestamp": "2026-03-09T14:30:05.456Z",
+  "level": "info",
+  "message": "processed import_jobs=2 recalc_jobs=1 variation_jobs=0"
+}
+```
+
+### Metrics to Monitor
+
+<CardGroup cols={2}>
+  <Card title="Job Throughput" icon="gauge">
+    Jobs processed per minute/hour
+  </Card>
+  <Card title="Queue Depth" icon="list">
+    Number of pending jobs
+  </Card>
+  <Card title="Error Rate" icon="triangle-exclamation">
+    Percentage of failed jobs
+  </Card>
+  <Card title="Processing Time" icon="clock">
+    Average time per job type
+  </Card>
+</CardGroup>
+
+### Database Queries
+
+<CodeGroup>
+
+```sql Job Status Overview
+SELECT 
+  status,
+  COUNT(*) as count,
+  AVG(EXTRACT(EPOCH FROM (finished_at - started_at))) as avg_duration_sec
+FROM "GeospatialImportJob"
+WHERE created_at > NOW() - INTERVAL '24 hours'
+GROUP BY status;
+```
+
+```sql Recent Failures
+SELECT 
+  id,
+  original_filename,
+  error_message,
+  created_at,
+  finished_at
+FROM "GeospatialImportJob"
+WHERE status = 'FAILED'
+ORDER BY created_at DESC
+LIMIT 10;
+```
+
+```sql Queue Depth
+SELECT 
+  'import' as job_type,
+  COUNT(*) as pending_count
+FROM "GeospatialImportJob"
+WHERE status = 'PENDING'
+UNION ALL
+SELECT 
+  'recalc',
+  COUNT(*)
+FROM "GeospatialRecalcJob"
+WHERE status = 'PENDING';
+```
+
+```sql Worker Performance
+SELECT 
+  DATE_TRUNC('hour', created_at) as hour,
+  COUNT(*) FILTER (WHERE status = 'COMPLETED') as completed,
+  COUNT(*) FILTER (WHERE status = 'FAILED') as failed,
+  AVG(EXTRACT(EPOCH FROM (finished_at - started_at))) as avg_duration
+FROM "GeospatialImportJob"
+WHERE created_at > NOW() - INTERVAL '7 days'
+GROUP BY hour
+ORDER BY hour DESC;
+```
+
+</CodeGroup>
+
+## Scaling Strategies
+
+### Horizontal Scaling
+
+Run multiple worker instances:
+
+```bash
+# With PM2
+pm2 start ecosystem.config.cjs --only confor-geo-worker -i 3
+
+# With Docker
+docker compose up -d --scale worker=5
+```
+
+<Warning>
+Multiple workers will compete for jobs. Ensure your batch sizes account for this:
+- 3 workers × 100 batch size = 300 jobs processed per cycle
+- Monitor for idle workers if queue depth is low
+</Warning>
+
+### Vertical Scaling
+
+Increase batch sizes on powerful servers:
+
+```bash
+# Single worker on 8-core server
+GEO_IMPORT_BATCH_SIZE=1000
+GEO_RECALC_BATCH_SIZE=500
+```
+
+### Database Optimization
+
+Add indexes for worker queries:
+
+```sql
+CREATE INDEX CONCURRENTLY idx_import_job_status_created 
+  ON "GeospatialImportJob"(status, created_at) 
+  WHERE status = 'PENDING';
+
+CREATE INDEX CONCURRENTLY idx_recalc_job_status 
+  ON "GeospatialRecalcJob"(status, created_at) 
+  WHERE status = 'PENDING';
+```
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Worker not processing jobs">
+    **Symptoms:** Jobs stuck in PENDING status
+    
+    **Checklist:**
+    1. Verify worker is running: `pm2 status` or `ps aux | grep worker`
+    2. Check worker logs: `pm2 logs confor-geo-worker --lines 50`
+    3. Verify database connection: Test `DATABASE_URL` with `psql`
+    4. Check for exceptions in logs
+    5. Verify batch sizes are not 0
+    
+    **Solutions:**
+    ```bash
+    # Restart worker
+    pm2 restart confor-geo-worker
+    
+    # Run in debug mode
+    DEBUG=* pnpm worker:geo
+    
+    # Check database connectivity
+    npx prisma db pull
+    ```
+  </Accordion>
+
+  <Accordion title="High error rate on imports">
+    **Symptoms:** Many jobs with `FAILED` status
+    
+    **Common causes:**
+    - Invalid shapefile format (missing .prj, .shx, etc.)
+    - Unsupported coordinate system
+    - Invalid geometries (self-intersections)
+    - Missing required attributes (nivel2_id, nivel3_id, nivel4_id)
+    - Hierarchy references don't exist in database
+    
+    **Debug:**
+    ```sql
+    -- Find error patterns
+    SELECT 
+      error_message,
+      COUNT(*) as occurrences
+    FROM "GeospatialImportJob"
+    WHERE status = 'FAILED'
+      AND created_at > NOW() - INTERVAL '24 hours'
+    GROUP BY error_message
+    ORDER BY occurrences DESC;
+    ```
+  </Accordion>
+
+  <Accordion title="Worker consuming too much memory">
+    **Symptoms:** Out of memory errors, worker crashes
+    
+    **Solutions:**
+    - Reduce batch sizes:
+      ```bash
+      GEO_IMPORT_BATCH_SIZE=50
+      GEO_RECALC_BATCH_SIZE=20
+      ```
+    - Increase `restart_delay` in PM2 config
+    - Add memory limit to PM2:
+      ```javascript
+      max_memory_restart: "500M"
+      ```
+    - Use horizontal scaling instead of large batches
+  </Accordion>
+
+  <Accordion title="Jobs processing too slowly">
+    **Symptoms:** Queue depth growing, long processing times
+    
+    **Solutions:**
+    1. **Scale horizontally**: Add more worker instances
+    2. **Increase batch sizes** (if CPU/memory allows)
+    3. **Reduce polling interval**:
+       ```bash
+       GEO_WORKER_INTERVAL_MS=2000
+       ```
+    4. **Optimize database**:
+       ```sql
+       VACUUM ANALYZE "GeospatialImportJob";
+       VACUUM ANALYZE "PatrimonyLevel4";
+       ```
+    5. **Add database indexes** (see Scaling > Database Optimization)
+  </Accordion>
+
+  <Accordion title="Worker stops after some time">
+    **Symptoms:** Worker runs for hours then stops
+    
+    **Possible causes:**
+    - Database connection timeout
+    - Unhandled promise rejection
+    - Memory leak causing restart
+    
+    **Solutions:**
+    ```javascript
+    // In ecosystem.config.cjs
+    {
+      max_restarts: 50,           // Allow more restarts
+      restart_delay: 5000,        // Wait 5s between restarts
+      exp_backoff_restart_delay: 100,  // Exponential backoff
+      max_memory_restart: "1G",   // Restart at 1GB
+    }
+    ```
+    
+    Check logs for patterns before crashes:
+    ```bash
+    pm2 logs confor-geo-worker --lines 200 | grep -i error
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use PM2 in Production" icon="server">
+    PM2 provides automatic restarts, log management, and monitoring.
+  </Card>
+  
+  <Card title="Monitor Queue Depth" icon="chart-line">
+    Alert when pending jobs exceed threshold (e.g., >1000).
+  </Card>
+  
+  <Card title="Set Conservative Defaults" icon="shield">
+    Start with low batch sizes and increase based on performance.
+  </Card>
+  
+  <Card title="Separate Worker Server" icon="server">
+    Run workers on dedicated infrastructure in production.
+  </Card>
+  
+  <Card title="Enable Graceful Shutdown" icon="power-off">
+    Handle SIGTERM/SIGINT to finish current jobs before exiting.
+  </Card>
+  
+  <Card title="Implement Dead Letter Queue" icon="envelope">
+    Move repeatedly failing jobs to a separate queue for investigation.
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Variables" icon="gear" href="/configuration/environment-variables">
+    Complete environment variable reference
+  </Card>
+  <Card title="Database Setup" icon="database" href="/configuration/database-setup">
+    PostgreSQL and Prisma configuration
+  </Card>
+  <Card title="Shapefile Import" icon="map" href="/guides/importing-shapefiles">
+    Learn about shapefile requirements
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/geo/import">
+    Geospatial job API endpoints
+  </Card>
+</CardGroup>

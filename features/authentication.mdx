@@ -1,0 +1,327 @@
+---
+title: Authentication & Access Control
+description: Secure user authentication with role-based access control and organization-scoped permissions
+---
+
+## Overview
+
+CONFOR implements a comprehensive authentication system that supports multiple authentication providers, role-based access control (RBAC), and organization-scoped permissions. The system ensures secure access to forestry data while providing flexible user management capabilities.
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Multi-Provider Auth" icon="lock">
+    Support for local authentication, Google, GitHub, and Microsoft OAuth providers
+  </Card>
+  <Card title="Role-Based Access" icon="users">
+    Flexible RBAC system with custom roles and granular permissions
+  </Card>
+  <Card title="Organization Scoping" icon="building">
+    Users are scoped to organizations with isolated data access
+  </Card>
+  <Card title="Session Management" icon="clock">
+    Secure session handling with refresh tokens and device tracking
+  </Card>
+</CardGroup>
+
+## Authentication Providers
+
+CONFOR supports multiple authentication methods:
+
+```typescript prisma/schema.prisma
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  GITHUB
+  MICROSOFT
+}
+```
+
+### Local Authentication
+
+Users can register with email and password using the registration endpoint:
+
+```typescript src/app/api/auth/register/route.ts
+export async function POST(req: NextRequest) {
+  const parsed = registerSchema.safeParse(body);
+  
+  const passwordHash = await hashPassword(password);
+  const user = await prisma.user.create({
+    data: {
+      email,
+      firstName,
+      lastName,
+      passwordHash,
+      status: "PENDING_VERIFICATION",
+      organizationId: organization.id,
+    },
+  });
+}
+```
+
+### OAuth Providers
+
+External authentication through:
+- **Google**: Social login via Google OAuth 2.0
+- **GitHub**: Developer authentication
+- **Microsoft**: Enterprise single sign-on
+
+## User Status Lifecycle
+
+Users progress through different status states:
+
+```typescript prisma/schema.prisma
+enum UserStatus {
+  ACTIVE              // Full access to the system
+  INACTIVE            // Temporarily disabled
+  PENDING_VERIFICATION // Awaiting admin approval
+  LOCKED              // Temporarily locked due to security
+  DELETED             // Soft deleted
+}
+```
+
+### Registration Workflow
+
+1. **User Registration**: User submits registration form with email, password, and profile details
+2. **Organization Assignment**: User is assigned to a default or specified organization
+3. **Pending Verification**: Account status set to `PENDING_VERIFICATION`
+4. **Admin Approval**: Organization admin activates the user
+5. **Active Status**: User can access the system
+
+<Note>
+  New users require admin approval before accessing the system. This ensures controlled access to sensitive forestry data.
+</Note>
+
+## Role-Based Access Control
+
+### Permission Model
+
+Permissions are organized by module and action:
+
+```typescript prisma/schema.prisma
+enum PermissionAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  EXPORT
+  ADMIN
+}
+```
+
+### System Roles
+
+<AccordionGroup>
+  <Accordion title="SUPER_ADMIN">
+    Full system access across all organizations. Can manage organizations, system configurations, and global settings.
+  </Accordion>
+  
+  <Accordion title="ADMIN">
+    Organization-scoped administrator. Can manage users, roles, and data within their organization.
+  </Accordion>
+  
+  <Accordion title="USER">
+    Standard user with read and write access to forestry data based on assigned permissions.
+  </Accordion>
+</AccordionGroup>
+
+### Permission Enforcement
+
+API routes enforce permissions using helper functions:
+
+```typescript src/app/api/forest/patrimony/route.ts
+export async function POST(req: NextRequest) {
+  const authResult = await requireAuth();
+  if ("error" in authResult) return authResult.error;
+
+  const isSuperAdmin = authResult.session.user.roles?.includes("SUPER_ADMIN");
+  if (!isSuperAdmin) {
+    const permissionError = requirePermission(
+      authResult.session.user.permissions,
+      "forest-patrimony",
+      "CREATE"
+    );
+    if (permissionError) return permissionError;
+  }
+}
+```
+
+## Organization Scoping
+
+All users belong to an organization, and data access is scoped accordingly:
+
+```typescript src/app/api/organizations/route.ts
+const organizations = await prisma.organization.findMany({
+  where: {
+    deletedAt: null,
+    ...(isScopedAdmin(roles) ? { id: organizationId } : {}),
+  },
+});
+```
+
+### Organization Properties
+
+- **Name & Slug**: Unique identifier for the organization
+- **Country Association**: Geographic location
+- **Active Status**: Control organization access
+- **Settings**: Custom configuration (including RIF/tax ID)
+
+## Session Management
+
+### Session Features
+
+<Steps>
+  <Step title="Token Generation">
+    Secure token hash generated on successful authentication
+  </Step>
+  <Step title="Device Tracking">
+    IP address, user agent, and device information recorded
+  </Step>
+  <Step title="Refresh Tokens">
+    Long-lived refresh tokens for seamless re-authentication
+  </Step>
+  <Step title="Session Expiry">
+    Configurable expiration with automatic cleanup
+  </Step>
+</Steps>
+
+### Session Data Structure
+
+```typescript prisma/schema.prisma
+model Session {
+  id           String     @id @default(uuid())
+  userId       String
+  tokenHash    String     @unique
+  refreshToken String?    @unique
+  ipAddress    String?
+  userAgent    String?
+  deviceInfo   Json?
+  isActive     Boolean    @default(true)
+  expiresAt    DateTime
+  lastActivity DateTime   @default(now())
+  revokedAt    DateTime?
+}
+```
+
+## Password Management
+
+### Password Requirements
+
+Passwords must meet security criteria defined in validation schemas:
+
+```typescript src/validations/auth.schema.ts
+export const changePasswordSchema = z
+  .object({
+    currentPassword: z.string().min(1),
+    newPassword: passwordSchema,
+    confirmPassword: z.string().min(1),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword)
+  .refine((data) => data.currentPassword !== data.newPassword);
+```
+
+### Password Reset Flow
+
+1. User requests password reset via `/api/auth/forgot-password`
+2. System generates secure token stored in `PasswordResetToken` table
+3. Token sent to user's email (expires after configured time)
+4. User submits new password with token via `/api/auth/reset-password`
+5. Token validated and password updated
+
+## Security Features
+
+<CardGroup cols={2}>
+  <Card title="Password Hashing" icon="shield">
+    Secure password storage using industry-standard hashing algorithms
+  </Card>
+  <Card title="Failed Login Tracking" icon="chart-line">
+    Automatic account locking after multiple failed attempts
+  </Card>
+  <Card title="MFA Support" icon="mobile">
+    Optional multi-factor authentication with backup codes
+  </Card>
+  <Card title="Audit Logging" icon="file-lines">
+    All authentication events logged for security monitoring
+  </Card>
+</CardGroup>
+
+### Account Locking
+
+```typescript prisma/schema.prisma
+model User {
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+  mfaEnabled          Boolean   @default(false)
+  mfaSecret           String?
+  mfaBackupCodes      String[]
+}
+```
+
+## Login Validation
+
+Before authentication, the system validates user eligibility:
+
+```typescript src/app/api/auth/login-validation/route.ts
+export async function POST(req: NextRequest) {
+  // Check if user exists and belongs to organization
+  if (!user.organizationId || user.organizationId !== organizationId) {
+    return fail("El usuario no pertenece a la organización seleccionada");
+  }
+
+  // Verify organization is active
+  if (!user.organization.isActive || user.organization.deletedAt) {
+    return fail("La organización seleccionada no está disponible");
+  }
+
+  // Check user status
+  if (user.status !== "ACTIVE") {
+    return fail("El usuario no está activo");
+  }
+}
+```
+
+## Audit Trail
+
+All authentication events are logged:
+
+```typescript src/app/api/auth/register/route.ts
+await prisma.auditLog.create({
+  data: {
+    userId: user.id,
+    action: "CREATE",
+    entityType: "User",
+    entityId: user.id,
+  },
+});
+```
+
+### Audited Actions
+
+- `LOGIN`: Successful user login
+- `LOGOUT`: User logout
+- `LOGIN_FAILED`: Failed login attempt
+- `PASSWORD_RESET`: Password reset request
+- `PERMISSION_CHANGE`: Role or permission modification
+
+## Best Practices
+
+<Warning>
+  **Security Recommendations**
+  - Enable MFA for administrative users
+  - Regularly review audit logs for suspicious activity
+  - Use strong password policies
+  - Implement session timeout for sensitive environments
+</Warning>
+
+<Tip>
+  **User Management Tips**
+  - Create custom roles for specific job functions
+  - Regularly audit user permissions
+  - Disable inactive accounts promptly
+  - Use organization scoping to isolate tenant data
+</Tip>
+
+## Related Documentation
+
+- [Organizations](./organizations) - Organization management and configuration
+- [API Reference](/api/auth/login) - Authentication API endpoints

@@ -1,0 +1,196 @@
+---
+title: 'Import Biological Assets'
+description: 'Bulk import biological assets from Excel or CSV files'
+api: 'POST /api/forest/biological-assets/import'
+---
+
+Bulk imports biological assets from Excel (.xlsx) or CSV files. This endpoint processes multiple biological asset records in a single operation, creating new records or updating existing ones based on the biological asset key.
+
+## Authentication
+
+Requires authentication with valid session token. Users must have `forest-biological-asset` CREATE or UPDATE permissions. SUPER_ADMIN role has full access.
+
+## Request
+
+This endpoint accepts **multipart/form-data** with the following fields:
+
+<ParamField body="file" type="file" required>
+  Excel (.xlsx) or CSV (.csv) file containing biological asset records. See [File Format](#file-format) below.
+</ParamField>
+
+<ParamField body="level4Id" type="string" required>
+  ID of the Level 4 patrimony unit (UUID format). All imported assets will be associated with this unit.
+</ParamField>
+
+## File Format
+
+The import file must contain the following columns. Column names are case-insensitive and can be in English or Spanish.
+
+### Required Column
+
+- **biologicalAssetKey** / **clavebiologica** / **clavebiológica** (required)
+
+### Optional Columns
+
+<ParamField body="accountingKey / clavecontable" type="string">
+  Accounting key for financial tracking
+</ParamField>
+
+<ParamField body="assetType / tipoactivo / tipo" type="string">
+  Asset type: `COMERCIAL` or `INVESTIGACION`
+</ParamField>
+
+<ParamField body="establishmentDate / fechaestablecimiento" type="date">
+  Date when the asset was established (YYYY-MM-DD format)
+</ParamField>
+
+<ParamField body="plantingYear / anoplantacion / añoplantación" type="number">
+  Year of planting
+</ParamField>
+
+<ParamField body="inventoryCode / inventariocodigo" type="string">
+  Inventory code
+</ParamField>
+
+<ParamField body="inventoryType / inventariotipo" type="string">
+  Type of inventory
+</ParamField>
+
+<ParamField body="inventoryDate / fechainventario" type="date">
+  Date of inventory (YYYY-MM-DD format)
+</ParamField>
+
+<ParamField body="isActive / estado / estatus" type="boolean">
+  Active status. Accepts: `1`, `true`, `si`, `sí`, `yes`, `activo`, `activa` (for true) or `0`, `false`, `no`, `inactivo`, `inactiva` (for false)
+</ParamField>
+
+### Column Name Variations
+
+The import parser supports multiple column name variations:
+- Spaces, dashes, and underscores are ignored
+- Accents are normalized (e.g., "biológica" = "biologica")
+- Case-insensitive matching
+
+## Import Behavior
+
+- **Create**: If a biological asset key doesn't exist, a new record is created
+- **Update**: If a biological asset key already exists, the record is updated with new values
+- **Skip**: Invalid rows are skipped and reported in the response
+
+## Response
+
+<ResponseField name="created" type="number">
+  Number of new biological assets created
+</ResponseField>
+
+<ResponseField name="updated" type="number">
+  Number of existing biological assets updated
+</ResponseField>
+
+<ResponseField name="skipped" type="number">
+  Number of rows skipped due to errors
+</ResponseField>
+
+<ResponseField name="errors" type="array">
+  Array of error objects for rows that failed to import
+  <Expandable title="Error Object">
+    <ResponseField name="row" type="number">
+      Row number in the file (1-based, excluding header)
+    </ResponseField>
+    
+    <ResponseField name="key" type="string">
+      The biological asset key that failed (if available)
+    </ResponseField>
+    
+    <ResponseField name="error" type="string">
+      Error message describing why the import failed
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+- **400**: Invalid request
+  - File not provided
+  - Invalid file format (must be .xlsx or .csv)
+  - Level 4 ID not provided
+  - File contains no records
+  - Missing required column (biologicalAssetKey)
+- **401**: Unauthorized (not authenticated)
+- **403**: Forbidden (user lacks required permissions or organization)
+- **404**: Level 4 unit not found or not accessible
+
+## Example Request
+
+```bash
+curl -X POST "https://api.example.com/api/forest/biological-assets/import" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@biological_assets.xlsx" \
+  -F "level4Id=123e4567-e89b-12d3-a456-426614174000"
+```
+
+## Example Excel File Structure
+
+| biologicalAssetKey | accountingKey | assetType  | plantingYear | inventoryCode | isActive |
+|--------------------|---------------|------------|--------------|---------------|----------|
+| BA-PINE-001        | ACC-001       | COMERCIAL  | 2020         | INV-2023-001  | true     |
+| BA-PINE-002        | ACC-002       | COMERCIAL  | 2021         | INV-2023-002  | true     |
+| BA-EUC-001         | ACC-003       | INVESTIGACION | 2019      | INV-2023-003  | false    |
+
+## Example CSV File
+
+```csv
+biologicalAssetKey,accountingKey,assetType,plantingYear,inventoryCode,isActive
+BA-PINE-001,ACC-001,COMERCIAL,2020,INV-2023-001,true
+BA-PINE-002,ACC-002,COMERCIAL,2021,INV-2023-002,true
+BA-EUC-001,ACC-003,INVESTIGACION,2019,INV-2023-003,false
+```
+
+## Example Response
+
+```json
+{
+  "created": 2,
+  "updated": 1,
+  "skipped": 0,
+  "errors": []
+}
+```
+
+## Example Response with Errors
+
+```json
+{
+  "created": 5,
+  "updated": 3,
+  "skipped": 2,
+  "errors": [
+    {
+      "row": 4,
+      "key": "BA-INVALID",
+      "error": "biologicalAssetKey es obligatorio"
+    },
+    {
+      "row": 7,
+      "key": "BA-ERROR",
+      "error": "Invalid foreign key constraint"
+    }
+  ]
+}
+```
+
+## Tips for Successful Imports
+
+1. **Validate your file**: Ensure all required columns are present with correct naming
+2. **Use unique keys**: Each biological asset key must be unique
+3. **Date format**: Use ISO format (YYYY-MM-DD) for dates
+4. **Encoding**: Save CSV files as UTF-8 to support special characters
+5. **Test with small batches**: Start with a few rows to verify your format
+6. **Review errors**: Check the errors array to identify and fix problematic rows
+
+## Performance Considerations
+
+- Files are processed sequentially to maintain data consistency
+- Large files (1000+ rows) may take several seconds to process
+- The endpoint validates Level 4 access before processing any rows
+- Each row is validated individually before creation/update

@@ -1,80 +1,409 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start Guide
+description: Get started with CONFOR in 5 minutes - from account creation to your first forest unit
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+Before you begin, ensure:
 
-### Step 1: Set up your local environment
+- CONFOR is installed and running (see [Installation](/installation))
+- You can access the application at `http://localhost:3000` (or your configured URL)
+- PostgreSQL database is running and migrated
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+## Getting Started
+
+This guide will walk you through creating your first account, logging in, and setting up your initial forest patrimony structure.
+
+<Steps>
+  <Step title="Register Your Account">
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    Navigate to the registration page and create your account:
+
+    ```bash
+    http://localhost:3000/auth/register
+    ```
+
+    Fill in the registration form:
+
+    <CodeGroup>
+    ```json Registration Request Body
+    {
+      "email": "your.email@company.com",
+      "firstName": "Juan",
+      "lastName": "Pérez",
+      "password": "SecurePass123!"
+    }
+    ```
+    </CodeGroup>
+
+    <Note>
+    Upon registration, your account will be in **PENDING_VERIFICATION** status. A default organization "Por defecto" is automatically created and assigned to your user with a USER role.
+    </Note>
+
+    The system will respond:
+
+    ```json
+    {
+      "message": "Cuenta creada. Pendiente de aprobacion por un ADMIN."
+    }
+    ```
+
+  </Step>
+
+  <Step title="Activate Your Account (Development)">
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+    For development environments, you can use the seeded admin account to activate your user:
 
-### Step 2: Deploy your changes
+    **Seeded Admin Credentials:**
+    - Email: `admin@example.com`
+    - Password: `Admin1234`
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    Login as admin and navigate to:
+
+    ```bash
+    http://localhost:3000/dashboard/users
+    ```
+
+    Find your user and update the status from `PENDING_VERIFICATION` to `ACTIVE`.
+
+    <Tip>
+    In production, implement a proper email verification workflow using the `EmailVerificationToken` model included in the system.
+    </Tip>
+
+  </Step>
+
+  <Step title="Login to Your Account">
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    Once activated, login with your credentials:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+    ```bash
+    http://localhost:3000/auth/login
+    ```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+    The system uses **NextAuth v5** with credentials provider. Successful login creates a session and redirects you to the dashboard.
 
-### Step 3: Go live
+    ```typescript
+    // Login request
+    POST /api/auth/login-validation
+    {
+      "email": "your.email@company.com",
+      "password": "SecurePass123!"
+    }
+    ```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+    <Warning>
+    After 5 failed login attempts, your account will be locked. The `lockedUntil` field tracks temporary locks.
+    </Warning>
 
-## Next steps
+  </Step>
 
-Now that you have your docs running, explore these key features:
+  <Step title="Navigate to Forest Patrimony">
+    
+    From the dashboard, navigate to the Forest Patrimony module:
+
+    ```bash
+    http://localhost:3000/dashboard/patrimonio-forestal
+    ```
+
+    You'll see a 5-tab interface:
+
+    - **Nivel 2** - Properties (Finca/Predio/Hato/ABRAE)
+    - **Nivel 3** - Compartments (Lote/Compartimiento/Block)
+    - **Nivel 4** - Stands (Rodal/Parcela/Enumeration)
+    - **Nivel 5** - Plots (Subunidad/Subparcela/Muestra)
+    - **Colindantes** - Neighbors
+
+  </Step>
+
+  <Step title="Create Your First Finca (Level 2)">
+    
+    Create a top-level property:
+
+    1. Click the **Nivel 2** tab
+    2. Fill in the creation form:
+
+    <CodeGroup>
+    ```typescript Level 2 Form Data
+    {
+      code: "FINCA-001",           // Unique identifier
+      name: "Finca San José",      // Property name
+      type: "FINCA",               // FINCA | PREDIO | HATO | FUNDO | HACIENDA | ABRAE
+      legalStatus: "ADQUISICION",  // ADQUISICION | ARRIENDO | USUFRUCTO | COMODATO | DECRETO
+      totalAreaHa: "150.50"        // Total area in hectares
+    }
+    ```
+
+    ```typescript Level 2 Optional Fields
+    {
+      legalDocumentDate: "2026-01-15",
+      ownerRepresentative: "Juan Pérez García",
+      publicRegistryNumber: "REG-2026-001234",
+      publicRegistryDate: "2026-01-20",
+      address: "Km 45 Carretera Nacional, Municipio Forestal",
+      centroidLatitude: 10.5678,
+      centroidLongitude: -67.1234
+    }
+    ```
+    </CodeGroup>
+
+    Click **Crear** to submit.
+
+    <Tip>
+    The system automatically associates the Finca with your current organization. Multi-organization isolation is enforced at the database level.
+    </Tip>
+
+    The API endpoint:
+
+    ```typescript
+    POST /api/forest/patrimony
+    {
+      "level": "2",
+      "data": {
+        "code": "FINCA-001",
+        "name": "Finca San José",
+        "type": "FINCA",
+        "legalStatus": "ADQUISICION",
+        "totalAreaHa": 150.50
+      }
+    }
+    ```
+
+  </Step>
+
+  <Step title="Create a Lote (Level 3)">
+    
+    Now create a compartment within your Finca:
+
+    1. Select your newly created Finca from the Nivel 2 list
+    2. Click the **Nivel 3** tab
+    3. Fill in the form:
+
+    ```typescript
+    {
+      code: "LOTE-A",              // Unique within parent Level 2
+      name: "Lote Norte",
+      type: "LOTE",                // COMPARTIMIENTO | BLOCK | SECCION | LOTE | ZONA | BLOQUE | ZONIFICACION
+      totalAreaHa: "45.75"
+    }
+    ```
+
+    <Note>
+    Level 3 codes must be unique within their parent Level 2. The system enforces this with a compound unique index: `[level2Id, code]`
+    </Note>
+
+    API call:
+
+    ```typescript
+    POST /api/forest/patrimony
+    {
+      "level": "3",
+      "data": {
+        "level2Id": "<finca-uuid>",
+        "code": "LOTE-A",
+        "name": "Lote Norte",
+        "type": "LOTE",
+        "totalAreaHa": 45.75
+      }
+    }
+    ```
+
+  </Step>
+
+  <Step title="Create a Rodal (Level 4)">
+    
+    Create a stand within your Lote:
+
+    1. Select your Lote from the Nivel 3 list
+    2. Click the **Nivel 4** tab
+    3. Complete the form:
+
+    ```typescript
+    {
+      code: "RODAL-001",           // Unique within parent Level 3
+      name: "Rodal Pinos 2020",
+      type: "RODAL",               // RODAL | PARCELA | ENUMERATION | UNIDAD_DE_MANEJO | CONUCO | OTRO_USO
+      fscCertificateStatus: "SI", // SI | NO
+      totalAreaHa: "12.30",
+      currentLandUseName: "Plantación Pinus caribaea",
+      rotationPhase: "Fase 1 - Crecimiento"
+    }
+    ```
+
+    <Tip>
+    Level 4 is where geospatial data is attached. You can upload shapefiles to automatically calculate areas and centroids for multiple stands at once.
+    </Tip>
+
+  </Step>
+
+  <Step title="Add Neighbors (Optional)">
+    
+    Document adjoining properties for your Finca:
+
+    1. Select your Finca in Nivel 2
+    2. Click the **Colindantes** tab
+    3. Add neighbor information:
+
+    ```typescript
+    {
+      code: "COLIND-NORTE",
+      name: "Finca El Pinar",
+      type: "Propiedad Privada"
+    }
+    ```
+
+    API endpoint:
+
+    ```typescript
+    POST /api/forest/patrimony/neighbors
+    {
+      "level2Id": "<finca-uuid>",
+      "code": "COLIND-NORTE",
+      "name": "Finca El Pinar",
+      "type": "Propiedad Privada"
+    }
+    ```
+
+  </Step>
+
+  <Step title="Import Bulk Data (Optional)">
+    
+    You can import multiple units at once using CSV or XLSX files:
+
+    ### CSV Format for Level 2:
+
+    ```csv
+    code,name,type,legalStatus,totalAreaHa,ownerRepresentative
+    FINCA-002,Finca El Bosque,FINCA,ADQUISICION,200.00,María González
+    FINCA-003,Predio Forestal Sur,PREDIO,ARRIENDO,180.50,Pedro Martínez
+    ```
+
+    ### Import via UI:
+
+    1. Click the **Importar** button in any level tab
+    2. Select your CSV or XLSX file
+    3. The system processes and reports results:
+
+    ```json
+    {
+      "created": 2,
+      "updated": 0,
+      "skipped": 0,
+      "errors": []
+    }
+    ```
+
+    <Warning>
+    Import validation is strict. Ensure all required fields are present and codes are unique within their scope.
+    </Warning>
+
+  </Step>
+
+  <Step title="View and Search">
+    
+    Use the built-in search and pagination:
+
+    - **Search bar** - Filters by code or name across all fields
+    - **Pagination** - Default 25 items per page (configurable)
+    - **Sorting** - Click column headers to sort
+    - **Export** - Download filtered results as CSV or XLSX
+
+    Example search query:
+
+    ```typescript
+    GET /api/forest/patrimony?level=2&search=bosque&page=1&limit=25&sortBy=name&sortOrder=asc
+    ```
+
+  </Step>
+</Steps>
+
+## Next Steps
+
+Now that you have your basic forest structure set up:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Upload Shapefiles" icon="map" href="/guides/importing-shapefiles">
+    Import geospatial data for Level 4 stands with automatic area calculation
+  </Card>
+  <Card title="Biological Assets" icon="tree" href="/features/biological-assets">
+    Track tree inventory, volume, and growth metrics at Level 6
+  </Card>
+  <Card title="User Management" icon="users" href="/guides/managing-users">
+    Add team members and configure role-based access control
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/auth/login">
+    Integrate CONFOR with your existing systems via REST API
+  </Card>
 </CardGroup>
 
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+## Common Operations
+
+### Editing Records
+
+Click the edit icon on any row to modify:
+
+```typescript
+PATCH /api/forest/patrimony
+{
+  "level": "2",
+  "id": "<uuid>",
+  "data": {
+    "name": "Finca San José - Actualizada",
+    "totalAreaHa": 155.00,
+    "isActive": true
+  }
+}
+```
+
+### Deactivating vs Deleting
+
+Prefer setting `isActive: false` over deletion to maintain historical records:
+
+```typescript
+// Recommended: Soft delete
+{ "isActive": false }
+
+// Use with caution: Hard delete
+DELETE /api/forest/patrimony
+{ "level": "2", "id": "<uuid>" }
+```
+
+### Exporting Data
+
+```typescript
+GET /api/forest/patrimony/export?level=2&format=xlsx&limit=1000&sortBy=code&sortOrder=asc
+```
+
+Supported formats: `csv`, `xlsx`
+
+<Tip>
+Export respects your current search filters and sort preferences. Use this to generate custom reports.
+</Tip>
+
+## Troubleshooting
+
+### Can't Create Level 3 Unit
+
+**Error**: "Nivel 2 requerido"
+
+**Solution**: Ensure you have selected a parent Level 2 (Finca) from the list before attempting to create Level 3.
+
+### Duplicate Code Error
+
+**Error**: "El código ya existe"
+
+**Solution**: Codes must be unique within their scope. Level 2 codes are globally unique per organization. Level 3-5 codes must be unique within their parent.
+
+### Import Fails with Geometry Errors
+
+**Error**: "Geometrías inválidas"
+
+**Solution**: Ensure your shapefiles contain valid polygon geometries and include a .prj file with proper CRS definition. The system will attempt to transform to EPSG:4326.
+
+## Get Help
+
+For additional assistance:
+
+- Check the complete [Installation Guide](/installation) for environment setup
+- Review the [API Reference](/api/auth/login) for programmatic access
+- Contact your system administrator for organization-specific configurations

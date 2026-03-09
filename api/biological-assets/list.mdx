@@ -1,0 +1,288 @@
+---
+title: 'List Biological Assets'
+description: 'Retrieve a paginated list of biological assets'
+api: 'GET /api/forest/biological-assets'
+---
+
+Retrieves a paginated list of biological assets (Level 6) associated with Level 4 patrimony units. Results can be filtered by Level 4 unit and searched by biological key, accounting key, genetic material name, or inventory code.
+
+## Authentication
+
+Requires authentication with valid session token. Users must have `forest-biological-asset` READ or CREATE/UPDATE/DELETE permissions. SUPER_ADMIN role has full access.
+
+## Query Parameters
+
+<ParamField query="level4Id" type="string">
+  Filter by Level 4 patrimony unit ID (UUID format)
+</ParamField>
+
+<ParamField query="search" type="string">
+  Search term to filter by biological asset key, accounting key, genetic material name, or inventory code (case-insensitive)
+</ParamField>
+
+<ParamField query="sortBy" type="string" default="biologicalAssetKey">
+  Field to sort by. Options: `biologicalAssetKey`, `accountingKey`, `assetType`, `plantingYear`, `inventoryCode`, `isActive`, `createdAt`
+</ParamField>
+
+<ParamField query="sortOrder" type="string" default="asc">
+  Sort direction. Options: `asc`, `desc`
+</ParamField>
+
+<ParamField query="page" type="number" default="1">
+  Page number for pagination (minimum: 1)
+</ParamField>
+
+<ParamField query="limit" type="number" default="25">
+  Number of items per page (minimum: 1, maximum: 100)
+</ParamField>
+
+## Response
+
+<ResponseField name="items" type="array">
+  Array of biological asset objects
+  <Expandable title="Biological Asset Object">
+    <ResponseField name="id" type="string">
+      Unique identifier (UUID)
+    </ResponseField>
+    
+    <ResponseField name="level4Id" type="string">
+      Associated Level 4 patrimony unit ID
+    </ResponseField>
+    
+    <ResponseField name="biologicalAssetKey" type="string" required>
+      Unique biological asset key (max 220 characters)
+    </ResponseField>
+    
+    <ResponseField name="accountingKey" type="string">
+      Accounting key for financial tracking
+    </ResponseField>
+    
+    <ResponseField name="establishmentDate" type="date">
+      Date when the biological asset was established
+    </ResponseField>
+    
+    <ResponseField name="plantingYear" type="number">
+      Year of planting
+    </ResponseField>
+    
+    <ResponseField name="geneticMaterialCode" type="string">
+      Code for genetic material
+    </ResponseField>
+    
+    <ResponseField name="geneticMaterialName" type="string">
+      Name of genetic material
+    </ResponseField>
+    
+    <ResponseField name="assetType" type="string">
+      Type of asset. Options: `COMERCIAL`, `INVESTIGACION`
+    </ResponseField>
+    
+    <ResponseField name="managementSchemeCode" type="string">
+      Management scheme code
+    </ResponseField>
+    
+    <ResponseField name="managementSchemeName" type="string">
+      Management scheme name
+    </ResponseField>
+    
+    <ResponseField name="inventoryCode" type="string">
+      Inventory code
+    </ResponseField>
+    
+    <ResponseField name="inventoryType" type="string">
+      Type of inventory
+    </ResponseField>
+    
+    <ResponseField name="inventoryDate" type="date">
+      Date of inventory
+    </ResponseField>
+    
+    <ResponseField name="inventoryAgeYears" type="number">
+      Age of inventory in years
+    </ResponseField>
+    
+    <ResponseField name="level5UnitCount" type="number">
+      Number of Level 5 units
+    </ResponseField>
+    
+    <ResponseField name="spacingCode" type="string">
+      Spacing code
+    </ResponseField>
+    
+    <ResponseField name="spacingDescription" type="string">
+      Description of spacing
+    </ResponseField>
+    
+    <ResponseField name="spacingBetweenRowsM" type="decimal">
+      Spacing between rows in meters (up to 12 decimal places with 4 precision)
+    </ResponseField>
+    
+    <ResponseField name="spacingBetweenTreesM" type="decimal">
+      Spacing between trees in meters
+    </ResponseField>
+    
+    <ResponseField name="treeDensityPerHa" type="decimal">
+      Tree density per hectare
+    </ResponseField>
+    
+    <ResponseField name="survivalRate" type="decimal">
+      Survival rate percentage (up to 5 digits with 2 decimal precision)
+    </ResponseField>
+    
+    <ResponseField name="dominantHeightM" type="decimal">
+      Dominant height in meters
+    </ResponseField>
+    
+    <ResponseField name="meanHeightM" type="decimal">
+      Mean height in meters
+    </ResponseField>
+    
+    <ResponseField name="quadraticDiameterM" type="decimal">
+      Quadratic diameter in meters
+    </ResponseField>
+    
+    <ResponseField name="basalAreaM2" type="decimal">
+      Basal area in square meters
+    </ResponseField>
+    
+    <ResponseField name="unitVolumeM3NoBarkPerHa" type="decimal">
+      Unit volume without bark per hectare (cubic meters)
+    </ResponseField>
+    
+    <ResponseField name="unitVolumeM3WithBarkPerHa" type="decimal">
+      Unit volume with bark per hectare (cubic meters)
+    </ResponseField>
+    
+    <ResponseField name="totalVolumeM3NoBark" type="decimal">
+      Total volume without bark (cubic meters)
+    </ResponseField>
+    
+    <ResponseField name="totalVolumeM3WithBark" type="decimal">
+      Total volume with bark (cubic meters)
+    </ResponseField>
+    
+    <ResponseField name="adjustedVolumeM3NoBarkPerHa" type="decimal">
+      Adjusted volume without bark per hectare (cubic meters)
+    </ResponseField>
+    
+    <ResponseField name="adjustedVolumeM3WithBarkPerHa" type="decimal">
+      Adjusted volume with bark per hectare (cubic meters)
+    </ResponseField>
+    
+    <ResponseField name="imaClassCode" type="string">
+      IMA classification code
+    </ResponseField>
+    
+    <ResponseField name="imaClassName" type="string">
+      IMA classification name
+    </ResponseField>
+    
+    <ResponseField name="actualCostUsd" type="decimal">
+      Actual cost in USD (up to 18 digits with 2 decimal precision)
+    </ResponseField>
+    
+    <ResponseField name="isActive" type="boolean">
+      Whether the asset is active
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="datetime">
+      Creation timestamp
+    </ResponseField>
+    
+    <ResponseField name="updatedAt" type="datetime">
+      Last update timestamp
+    </ResponseField>
+    
+    <ResponseField name="level4" type="object">
+      Associated Level 4 patrimony unit details
+      <Expandable title="Level 4 Details">
+        <ResponseField name="id" type="string">
+          Level 4 unit ID
+        </ResponseField>
+        <ResponseField name="code" type="string">
+          Level 4 unit code
+        </ResponseField>
+        <ResponseField name="name" type="string">
+          Level 4 unit name
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="pagination" type="object">
+  Pagination metadata
+  <Expandable title="Pagination">
+    <ResponseField name="total" type="number">
+      Total number of items
+    </ResponseField>
+    
+    <ResponseField name="page" type="number">
+      Current page number
+    </ResponseField>
+    
+    <ResponseField name="limit" type="number">
+      Items per page
+    </ResponseField>
+    
+    <ResponseField name="totalPages" type="number">
+      Total number of pages
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Error Responses
+
+- **400**: Invalid parameters
+- **401**: Unauthorized (not authenticated)
+- **403**: Forbidden (user lacks required permissions or organization)
+
+## Example Request
+
+```bash
+curl -X GET "https://api.example.com/api/forest/biological-assets?level4Id=123e4567-e89b-12d3-a456-426614174000&search=pine&page=1&limit=25" \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+## Example Response
+
+```json
+{
+  "items": [
+    {
+      "id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
+      "level4Id": "123e4567-e89b-12d3-a456-426614174000",
+      "biologicalAssetKey": "BA-PINE-001",
+      "accountingKey": "ACC-001",
+      "establishmentDate": "2020-03-15T00:00:00Z",
+      "plantingYear": 2020,
+      "geneticMaterialCode": "GM-001",
+      "geneticMaterialName": "Pinus caribaea",
+      "assetType": "COMERCIAL",
+      "inventoryCode": "INV-2023-001",
+      "inventoryType": "Full Inventory",
+      "inventoryDate": "2023-06-01T00:00:00Z",
+      "inventoryAgeYears": 3,
+      "treeDensityPerHa": 1111,
+      "survivalRate": 95.5,
+      "dominantHeightM": 12.5,
+      "meanHeightM": 11.2,
+      "actualCostUsd": 15000.00,
+      "isActive": true,
+      "createdAt": "2023-01-10T14:30:00Z",
+      "updatedAt": "2023-06-15T09:20:00Z",
+      "level4": {
+        "id": "123e4567-e89b-12d3-a456-426614174000",
+        "code": "L4-001",
+        "name": "Rodal Norte"
+      }
+    }
+  ],
+  "pagination": {
+    "total": 48,
+    "page": 1,
+    "limit": 25,
+    "totalPages": 2
+  }
+}
+```

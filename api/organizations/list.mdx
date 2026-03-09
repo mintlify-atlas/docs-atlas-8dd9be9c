@@ -1,0 +1,142 @@
+---
+title: 'List Organizations'
+api: 'GET /api/organizations'
+description: 'Retrieve a list of all organizations'
+---
+
+## Overview
+
+Returns a list of all organizations that the authenticated user has access to. Access is determined by user role and permissions:
+
+- **SUPER_ADMIN**: Can view all organizations
+- **ADMIN**: Can only view their own organization
+- **Other roles**: Require explicit READ permission on the organizations module
+
+## Authentication
+
+This endpoint requires authentication. Include a valid session token in your request.
+
+<Note>
+  Scoped administrators (ADMIN role) will only see their own organization in the response.
+</Note>
+
+## Response
+
+Returns an object containing an array of organization items.
+
+<ResponseField name="items" type="array">
+  Array of organization objects
+  
+  <Expandable title="Organization Object">
+    <ResponseField name="id" type="string" required>
+      Unique identifier (UUID) for the organization
+    </ResponseField>
+    
+    <ResponseField name="name" type="string" required>
+      Organization name
+    </ResponseField>
+    
+    <ResponseField name="rif" type="string">
+      Tax identification number (RIF). Extracted from the organization settings.
+    </ResponseField>
+    
+    <ResponseField name="countryId" type="string">
+      UUID of the associated country. Can be null.
+    </ResponseField>
+    
+    <ResponseField name="createdAt" type="string" required>
+      ISO 8601 timestamp when the organization was created
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+```bash cURL
+curl -X GET https://your-domain.com/api/organizations \
+  -H "Authorization: Bearer YOUR_TOKEN"
+```
+
+```javascript JavaScript
+const response = await fetch('https://your-domain.com/api/organizations', {
+  method: 'GET',
+  headers: {
+    'Authorization': 'Bearer YOUR_TOKEN'
+  }
+});
+
+const data = await response.json();
+console.log(data.items);
+```
+
+```python Python
+import requests
+
+response = requests.get(
+    'https://your-domain.com/api/organizations',
+    headers={'Authorization': 'Bearer YOUR_TOKEN'}
+)
+
+data = response.json()
+print(data['items'])
+```
+</RequestExample>
+
+<ResponseExample>
+```json 200 - Success
+{
+  "items": [
+    {
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "name": "Acme Forest Corp",
+      "rif": "J-123456789",
+      "countryId": "660e8400-e29b-41d4-a716-446655440001",
+      "createdAt": "2024-01-15T08:30:00.000Z"
+    },
+    {
+      "id": "770e8400-e29b-41d4-a716-446655440002",
+      "name": "Green Timber Industries",
+      "rif": "J-987654321",
+      "countryId": "660e8400-e29b-41d4-a716-446655440001",
+      "createdAt": "2024-02-20T14:45:00.000Z"
+    }
+  ]
+}
+```
+
+```json 401 - Unauthorized
+{
+  "error": "Authentication required",
+  "message": "No valid session found"
+}
+```
+
+```json 403 - Forbidden
+{
+  "error": "Permission denied",
+  "message": "You do not have permission to view organizations"
+}
+```
+</ResponseExample>
+
+## Permissions
+
+This endpoint checks permissions in the following order:
+
+1. **Role-based access**: SUPER_ADMIN and ADMIN roles have automatic access
+2. **Permission-based access**: Users without admin roles must have the `organizations:READ` permission
+
+## Filtering
+
+The endpoint automatically filters results based on user role:
+
+- **SUPER_ADMIN**: Returns all active organizations
+- **ADMIN (scoped)**: Returns only the organization the user belongs to
+- **Other users**: Returns all organizations (if they have the required permission)
+
+All queries exclude soft-deleted organizations (where `deletedAt` is not null).
+
+## Implementation Details
+
+The response includes the `country` relationship via Prisma's `include` clause. Organizations are ordered by creation date in descending order (newest first).
+
+The `rif` field is extracted from the organization's `settings` JSON field.
